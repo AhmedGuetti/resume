@@ -20,9 +20,9 @@ PKGS=(
   texlive-langfrench texlive-langenglish
   # latexindent's Perl deps
   perl-yaml-tiny perl-file-homedir
-  # Tooling for editors / agents
+  # Editor tooling
   texlab                     # LaTeX language server (Neovim, VS Code, etc.)
-  poppler                    # pdftotext / pdfinfo: lets agents read the built PDF
+  poppler                    # pdftotext / pdfinfo (used by make text / check)
   make git
 )
 (( FULL )) && PKGS+=(texlive-fontsextra)

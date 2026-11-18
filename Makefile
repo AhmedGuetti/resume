@@ -22,7 +22,7 @@ view: $(LANG_)
 	@if command -v wslview >/dev/null; then wslview $(PDFDIR)/resume-$(LANG_).pdf; \
 	else explorer.exe "$$(wslpath -w $(PDFDIR)/resume-$(LANG_).pdf)" || true; fi
 
-# Plain-text dump = what an ATS / AI agent "sees". Review it after edits.
+# Plain-text dump = roughly what an ATS parser "sees". Review it after edits.
 text: all
 	@for l in $(LANGS); do pdftotext -layout $(PDFDIR)/resume-$$l.pdf build/resume-$$l.txt; done
 	@echo "-> build/resume-*.txt"

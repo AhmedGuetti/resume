@@ -6,3 +6,11 @@ build/
 *.fdb_latexmk
 *.synctex.gz
 *.xdv
+
+# AI assistant / agent files (local only)
+AGENTS.md
+CLAUDE.md
+.claude/
+.cursor/
+.cursorrules
+.github/copilot-instructions.md
