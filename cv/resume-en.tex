@@ -2,30 +2,75 @@
 
 \begin{document}
 
-\cvheader{Guetti}{AI/ML Engineer}
-  {Lille, France \;|\; \href{mailto:you@example.com}{you@example.com} \;|\; +33 6 00 00 00 00 \;|\;
-   \href{https://linkedin.com/in/you}{linkedin.com/in/you} \;|\; \href{https://github.com/you}{github.com/you}}
+\cvheader{Ahmed Guetti}
+  {Lille, France \sep +33 6 64 77 86 99 \sep
+   \href{mailto:ahmedguetti12@gmail.com}{ahmedguetti12@gmail.com} \sep
+   \href{https://github.com/AhmedGuetti}{github.com/AhmedGuetti} \sep
+   \href{https://linkedin.com/in/ahmed-guetti-09552b1b6}{linkedin.com/in/ahmed-guetti-09552b1b6}}
 
-\section{Summary}
-AI/ML engineer building production-grade agentic systems. % TODO: tailor per application
-
-\section{Experience}
-\cventry{AI Engineer (Apprentice)}{Magellan (formerly Worldline MeTS) -- M3S}{2024 -- 2026}{Seclin, France}
-\begin{itemize}
-  \item TODO: achievement with a measurable result.
-\end{itemize}
-
-\section{Projects}
-\cventry{Project name}{Tech stack}{2026}{}
-\begin{itemize}
-  \item TODO
-\end{itemize}
-
+% ---------- EDUCATION ----------
 \section{Education}
-\cventry{M2 Artificial Intelligence (IAFA)}{Université Toulouse III -- Paul Sabatier}{2024 -- 2026}{Toulouse, France}
+\cventry{Master 2 in Artificial Intelligence (IAFA), Computer Graphics and Imaging track; Rank: 16/43}
+  {Université Toulouse III -- Paul Sabatier}{Sept.\ 2026}{Toulouse, France}
+\begin{itemize}
+  \item Research Initiation Paper (TIR): ``Machine Learning for Combinatorial Optimization'' (TSP, branch-and-bound for MILP, SAT), co-authored with two classmates; presented as a poster
+  \item Relevant Coursework: Artificial Intelligence, Planning, Real-Time 3D Rendering (OpenGL), Geometry and Mesh Processing, Computer Vision, Distributed Systems, Distributed Databases
+  \item Coursework projects: person re-identification (LOMO + XQDA); glTF PBR renderer (Cook--Torrance, PCF shadow mapping); skeletal animation and skinning (CPU vs.\ GPU linear blend skinning)
+\end{itemize}
 
-\section{Skills}
-\cvskill{Languages}{Arabic, French, English}
-\cvskill{AI/ML}{TODO}
+% ---------- EXPERIENCE ----------
+\section{Experience}
+\cventry{AI/ML Engineer and QA Engineer (Work-Study)}
+  {Magellan (formerly Worldline MeTS / M3S)}{Oct.\ 2025 -- Sept.\ 2026}{Seclin, France}
+\begin{itemize}
+  \item Built production-grade agentic systems on internal AI projects alongside a QA/API-testing role (testing RATP APIs).
+  \item \textbf{BugPredict:} designed a multi-agent bug-detection pipeline with LangGraph; refactored a monolith into a modular architecture (ToolRegistry plugin system, Pydantic-based retrieval scope, conditional graph edges).
+  \item Benchmarked BugPredict on BigVul (precision 1.0, recall 0.235, F1 0.381) and built a results dashboard and a PySide6 desktop UI streaming live pipeline updates.
+  \item Set up GitLab CI/CD (prepare, build, release, notify stages) with automated versioned release artifacts.
+  \item \textbf{ARGUS:} built a general-purpose, YAML-configurable agent engine with swappable orchestrators (Gemini, LangGraph) and a plugin tool registry; developed a visual config editor (React, React Flow, Zustand).
+  \item Benchmarked a spec-vs-code inconsistency detection agent on CASCADE, SWE-bench slices and synthetic oracle datasets.
+  \item Produced demo and handover material (documentation, diagrams, demo video) for both projects.
+\end{itemize}
+
+\cventry{Research Intern}{ISIS Champollion, CHART Team}{Apr.\ -- July 2025}{Castres, France}
+\begin{itemize}
+  \item \textbf{EasyTalk:} worked on French medical temporal/event extraction (HeidelTime, Mistral, GLiNER, CamemBERT), served through FastAPI, with annotation in INCEpTION.
+  \item \textbf{EasyRMM:} refactored a legacy web application.
+\end{itemize}
+
+\cventry{Research Intern}{CNRS UMR LISA}{Apr.\ -- May 2025}{Corte, France}
+\begin{itemize}
+  \item Co-developed an NLP-based machine translation system for the Corsican language.
+  \item Built an AWK scripting pipeline for automated statistical analysis of model output, enabling data-driven identification of grammatical failure patterns.
+  \item Achieved a $\sim$10\% improvement in translation accuracy on complex phrases through targeted hyperparameter tuning.
+\end{itemize}
+
+% ---------- PROJECTS ----------
+\section{Projects}
+\cventry{C++ math library (namespace \texttt{gm}) and from-scratch ML algorithms}
+  {gmath / Machine Learning in C++}{2026 -- Present}{Personal project}
+\begin{itemize}
+  \item Implementing ML algorithms from scratch in C++ (1-NN/k-NN) on top of a reusable static math library (distance functions, generic KD-tree usable for both ML and rendering).
+\end{itemize}
+
+\cventry{Platform for job application organization}{Project Ninurta}{2026 -- Present}{Personal project}
+\begin{itemize}
+  \item Designing a multi-agent system that tailors my resume to each job offer based on my experience.
+  \item Tracking statistics on submitted applications and suggesting how to adjust their volume and targeting.
+\end{itemize}
+
+% \cventry{Multi-tenant personal automation platform}{Project Daedalus}{2026 -- Present}{Personal project}
+% \begin{itemize}
+%   \item Designing a Rust/axum backend with a typed DAG orchestration engine, SvelteKit frontend and Postgres + pgvector.
+% \end{itemize}
+
+% ---------- SKILLS ----------
+\section{Skills and Interests}
+\begin{cvskills}
+  \cvskill{Languages}{Python, C++, Rust, TypeScript/JavaScript, SQL}
+  \cvskill{AI/ML}{LangGraph, LangChain, Pydantic, agentic systems and evaluation, NLP (CamemBERT, GLiNER, LLM APIs), computer vision}
+  \cvskill{Tools}{OpenGL, FastAPI, React, PySide6, GCP, GitLab CI/CD, Git, WSL2/Linux, Neovim}
+  \cvskill{Languages spoken}{Arabic (native), French, English}
+\end{cvskills}
 
 \end{document}

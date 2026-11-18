@@ -1,48 +1,51 @@
 % resume.cls — shared layout for every language version.
 % Style lives here; content lives in resume-<lang>.tex. Change one, not both.
 \NeedsTeXFormat{LaTeX2e}
-\ProvidesClass{resume}[2026/11/18 Resume class]
+\ProvidesClass{resume}[2026/11/18 Resume class v2 (compact, black rules)]
 
 \DeclareOption*{\PassOptionsToPackage{\CurrentOption}{babel}}
 \ProcessOptions\relax
 \LoadClass[10pt]{article}
 
-\RequirePackage[a4paper,margin=1.5cm,top=1.2cm,bottom=1.2cm]{geometry}
+% A4 for France/EU; swap a4paper -> letterpaper for US applications
+\RequirePackage[a4paper,margin=0.6in,top=0.5in,bottom=0.5in]{geometry}
 \RequirePackage{fontspec}
-\setmainfont{TeX Gyre Heros}
+\setmainfont{TeX Gyre Heros}          % Helvetica clone, same look as \usepackage{helvet}
 \RequirePackage{babel}
 \RequirePackage{xcolor}
 \RequirePackage{titlesec}
 \RequirePackage{enumitem}
-\RequirePackage{tabularx}
 \RequirePackage[hidelinks]{hyperref}
-
-\definecolor{accent}{HTML}{1F4E79}
-\definecolor{muted}{HTML}{555555}
 
 \pagestyle{empty}
 \setlength{\parindent}{0pt}
-\linespread{1.05}
-\frenchspacing
+\setlength{\parskip}{0pt}
+\raggedbottom
 
-% Section headings: small caps + rule
-\titleformat{\section}{\large\bfseries\color{accent}\scshape}{}{0pt}{}[\vspace{-6pt}\color{accent}\rule{\linewidth}{0.6pt}]
-\titlespacing*{\section}{0pt}{8pt}{4pt}
+% Section headings: bold caps with a rule underneath
+\titleformat{\section}{\bfseries\normalsize}{}{0pt}{\MakeUppercase}[\vspace{-5pt}\rule{\textwidth}{0.5pt}]
+\titlespacing*{\section}{0pt}{7pt}{4pt}
 
-\setlist[itemize]{leftmargin=1.1em,itemsep=1pt,topsep=2pt,parsep=0pt,label=\textbullet}
+\setlist[itemize]{leftmargin=1.2em,itemsep=0pt,topsep=1pt,parsep=0pt,partopsep=0pt}
 
-% \cvheader{Name}{Title}{contact line}
-\newcommand{\cvheader}[3]{%
+% Bullet separator for the contact line
+\newcommand{\sep}{\ \raisebox{0.1ex}{$\bullet$}\ }
+
+% \cvheader{Name}{contact line}
+\newcommand{\cvheader}[2]{%
   \begin{center}
-    {\Huge\bfseries #1}\\[3pt]
-    {\large\color{accent} #2}\\[4pt]
-    {\small\color{muted} #3}
-  \end{center}\vspace{-4pt}}
+    {\LARGE\bfseries #1}\\[3pt]
+    #2
+  \end{center}}
 
 % \cventry{Role}{Organisation}{Dates}{Location}  then an itemize of bullets
+% Renders:  Organisation (bold) ........ Location (bold)
+%           Role (italic)    ........... Dates (italic)
 \newcommand{\cventry}[4]{%
-  \par\noindent\textbf{#1}\hfill{\small\color{muted}#3}\\
-  {\itshape #2}\hfill{\small\color{muted}#4}\par\vspace{1pt}}
+  \vspace{3pt}%
+  {\bfseries #2}\hfill {\bfseries #4}\\[-1pt]
+  {\itshape #1}\hfill {\itshape #3}\par}
 
-% \cvskill{Label}{Items}
-\newcommand{\cvskill}[2]{\noindent\textbf{#1:} #2\par\vspace{1pt}}
+% Skills block: \begin{cvskills} \cvskill{Label}{items} ... \end{cvskills}
+\newenvironment{cvskills}{\begin{itemize}}{\end{itemize}}
+\newcommand{\cvskill}[2]{\item \textbf{#1:} #2}
