@@ -53,20 +53,25 @@ def _skill_names(bank: dict) -> dict[str, str]:
 
 
 def check_evidence(bank: dict, ev: str) -> str | None:
-    """The evidence id in its canonical form, or None if it doesn't exist in the bank
-    (or points at a bullet tagged to-confirm)."""
+    """The evidence id in its canonical form "section/entry/bullet" (or "skill:<name>"),
+    or None if it doesn't exist in the bank or points at a bullet tagged to-confirm.
+
+    Models often cite just "bullet" or "entry/bullet" (the bank is shown to them grouped
+    by entry): those are accepted when they point at exactly one bullet."""
     ev = ev.strip()
     if ev.lower().startswith("skill:"):
         name = _skill_names(bank).get(ev[6:].strip().lower())
         return f"skill:{name}" if name else None
-    parts = ev.split("/")
-    if len(parts) != 3 or parts[0] not in ENTRY_SECTIONS:
+    parts = [p for p in ev.split("/") if p]
+    if not parts or len(parts) > 3:
         return None
-    section, eid, bid = parts
-    entry = bank[section].get(eid)
-    if not entry or bid not in entry.bullets or not usable(entry.bullets[bid]):
-        return None
-    return ev
+    matches = []
+    for section in ENTRY_SECTIONS:
+        for eid, entry in bank[section].items():
+            for bid, bullet in entry.bullets.items():
+                if [section, eid, bid][-len(parts):] == parts and usable(bullet):
+                    matches.append(f"{section}/{eid}/{bid}")
+    return matches[0] if len(matches) == 1 else None
 
 
 def on_resume(bank: dict, sel: Selection | None, ev: str) -> bool:

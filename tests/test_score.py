@@ -171,6 +171,20 @@ def test_check_evidence(bank):
     assert check_evidence(bank, "hobbies/a/b") is None
 
 
+def test_check_evidence_accepts_unambiguous_short_ids(bank):
+    from collections import Counter
+    full = [f"{s}/{e}/{b}" for s in ("education", "experience", "projects")
+            for e, entry in bank[s].items() for b, x in entry.bullets.items() if "to-confirm" not in x.tags]
+    counts = Counter(f.split("/")[2] for f in full)
+    unique = next(f for f in full if counts[f.split("/")[2]] == 1)
+    section, eid, bid = unique.split("/")
+    assert check_evidence(bank, bid) == unique                 # just the bullet id
+    assert check_evidence(bank, f"{eid}/{bid}") == unique      # entry/bullet
+    shared = [b for b, n in counts.items() if n > 1]
+    if shared:                                                 # e.g. "overview" in two entries
+        assert check_evidence(bank, shared[0]) is None
+
+
 def test_on_resume(bank, default_sel):
     shown = default_sel.experience[0]
     ev = f"experience/{shown.id}/{shown.bullet_ids()[0]}"
