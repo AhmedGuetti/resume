@@ -1,0 +1,4 @@
+pyyaml
+pydantic>=2
+httpx
+google-genai

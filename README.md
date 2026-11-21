@@ -1,44 +1,60 @@
-# Resume
+# Ninurta
 
-My CV, written in LaTeX, in English and French.
+My resume, and the small tool I'm building to tailor it to each job offer.
 
-If you're just here to read it, grab the PDF:
+All my experience, projects and skills live in one place, the [bank](bank/README.md), written
+in Markdown in English and French. From that, Ninurta builds my general resume and, for each
+application, a one-page version that puts forward what the offer is asking for.
+
+If you're just here to read the resume, grab the PDF:
 
 - [English](pdf/resume-en.pdf)
 - [Français](pdf/resume-fr.pdf)
 
-The rest of this README is mostly a note to future me on how to build it.
+The rest of this README is mostly a note to future me on how it all works.
 
 ## Layout
 
 ```
+bank/              all the content, as Markdown (see bank/README.md)
+brain/             the Python side: reads the bank, picks content for an offer, builds PDFs
+config.example.yaml  copy to config.yaml (git-ignored) for the LLM model and API keys
 cv/
   resume.cls       shared layout and macros (\cvheader, \cventry, \cvskill, ...)
-  resume-en.tex    English version
-  resume-fr.tex    French version
-pdf/               the compiled PDFs (committed so they're easy to grab)
+  resume-en.tex    English version (generated from bank/, don't edit)
+  resume-fr.tex    French version  (generated from bank/, don't edit)
+  company/<name>/  tailored resumes, one folder per application (not in git)
+pdf/               the general resume as PDF (committed so it's easy to grab)
 scripts/           setup script for Arch Linux on WSL2
 extras/nvim/       my Neovim config for editing LaTeX (vimtex + texlab)
 ```
 
-Both versions share the same class file, so a style change only has to be made once.
-Content is kept in sync by hand.
+Style lives in the class file and content lives in `bank/`, each in one place.
+The `.tex` files in `cv/` are generated from `bank/selections/default.yaml` on every `make`,
+so to change the resume, edit the bank (or the default selection), not the `.tex`.
 
-## Building
+## Setup
 
-You need a TeX Live install with LuaLaTeX and `latexmk`, plus `poppler` for `pdfinfo` / `pdftotext`.
+You need a TeX Live install with LuaLaTeX and `latexmk`, the Source Sans 3 font, `poppler`
+for `pdfinfo` / `pdftotext`, and Python 3 with the packages in `requirements.txt`
+(`pip install -r requirements.txt`). Without Source Sans 3 the build falls back to TeX Gyre Heros.
+
+To let an LLM pick the content, copy `config.example.yaml` to `config.yaml` and add a
+DeepSeek and a Google AI Studio API key (DeepSeek does the work, Gemini is the fallback).
+`config.yaml` is git-ignored.
+
 On Arch (including WSL), the bootstrap script installs everything:
 
 ```bash
 ./scripts/bootstrap-arch-wsl.sh
 ```
 
-Then:
+## The general resume
 
 ```bash
 make            # build both languages into pdf/
 make en         # just one
-make watch      # rebuild on save (LANG_=fr for the French one)
+make watch      # rebuild when bank/ or the class changes (LANG_=fr for French)
 make view       # open the PDF (WSL: uses the Windows default viewer)
 make check      # chktex lint + warns if a version spills onto a second page
 make text       # dump the PDFs to plain text in build/
@@ -51,21 +67,152 @@ Build artifacts go into `build/` (ignored by git); only the final PDFs are copie
 will extract from the PDF, which is a quick way to catch weird ligatures, broken ordering
 or text that silently disappeared.
 
+The one rule: **keep it to one page.** `make check` will complain if it isn't.
+
+## Tailoring it to a job offer
+
+The easiest way is the interactive shell:
+
+```bash
+make shell        # or: python -m brain
+```
+
+```
+ninurta> apply
+Paste the job offer, then type END on its own line (or press Ctrl-D):
+...
+ninurta> open company-x          # opens the English PDF (open company-x fr)
+ninurta> list                    # all applications, newest first
+ninurta> model deepseek:deepseek-chat   # switch model for this session (model off = no AI)
+ninurta> cost                    # what this session's LLM calls cost
+ninurta> help
+```
+
+Up/down arrows recall earlier commands and Tab completes command and company names.
+Everything also works as a one-off command, e.g. `make apply COMPANY="Company X" OFFER=offer.txt`
+or `python -m brain apply "Company X"` (which asks you to paste the offer).
+
+`apply` creates `cv/company/<company>/` with:
+
+```
+offer.md          the offer text
+job.json          the facts of the offer (see below)
+selection.yaml    what was picked, the keywords that matched, and what was added or dropped
+pdf/
+  resume-en.pdf   tailored resume, English
+  resume-fr.pdf   tailored resume, French
+tex/
+  resume-en.tex   the LaTeX they were built from (LaTeX's temporary files go in tex/.build/)
+  resume-fr.tex
+```
+
+**The facts of the offer (`job.json`).** The LLM reads the company, job title, location,
+work mode, contract, seniority, experience and degree asked, salary, posting date,
+number of applicants, start date, required and nice-to-have skills, duties and benefits.
+For every fact it must quote the words of the offer it got it from; facts whose quote isn't
+in the offer are thrown away. Salary amounts, the posting date ("2 weeks ago" -> a date)
+and the applicant count are then computed by the code from those quotes, never by the model.
+Whatever the offer doesn't say (company, title, location, salary, date, applicants, link),
+you're asked for, and pressing Enter leaves it empty. Empty stays `null`: nothing is guessed.
+`job.json` also records which fields you typed yourself, and an `application.status`
+to build statistics on later. In the shell, `show <company>` prints it.
+
+**Already applied?** `apply` first asks for the job's link (the LinkedIn page or the
+company's site; Enter skips it, and a link written in the offer is used as is). Before any
+LLM call, it stops if you already have that job: same link, or same offer text. Links are
+compared by job id, so the different forms of one LinkedIn job
+(`/jobs/view/123`, `/jobs/view/ml-engineer-at-acme-123`, `?currentJobId=123`) all match,
+and the same goes for Greenhouse, Lever and Indeed links. After reading the offer it also
+warns about the same company with the same job title (often a repost). Each time you can
+answer `y` to go ahead anyway, or pass `--force`.
+
+The company name comes from the offer, so `apply` alone is enough; `apply "Company X"` still
+works. A new application always gets its own folder: `<company>`, or `<company>-2`, `-3`...
+if that name is taken, so an earlier application is never overwritten.
+
+**Who picks the content.** An LLM reads the offer and the bank and chooses which bullets,
+projects and skills to use, most relevant first. It only chooses: it never writes resume
+text, and any id it makes up is dropped (and reported). Bullets tagged `to-confirm` are
+never shown to it, and a bullet and its `-short` variant never end up on the same page.
+Without a model, or with `--no-ai`, plain keyword matching does the job: it looks for the
+bank's tags and skill names in the offer, with a few English/French synonyms.
+
+**Keeping the cost down.** `config.yaml` says which model does which job:
+
+```yaml
+models:
+  extract: deepseek:deepseek-chat     # read the offer's facts
+  select: deepseek:deepseek-chat      # pick the resume content
+  fallback: gemini:gemini-3.6-flash   # only when DeepSeek fails or answers badly
+budget:
+  daily: 0.50                         # $; when reached, apply goes on without AI
+  monthly: 5.00
+gemini_thinking: false                # Gemini's thinking is billed as output; off
+```
+
+- DeepSeek does both jobs. Gemini is only called when DeepSeek errors, returns broken
+  JSON, or answers badly (4+ facts not found in the offer, or 3+ made-up ids).
+- The fixed part of each prompt (instructions, then your whole bank) comes first and the
+  offer last, so from the second application on, providers serve that part from their
+  cache at a fraction of the price.
+- Every call is logged in `cv/company/.usage.jsonl` (tokens, cached tokens, estimated $).
+  Before each call the budget is checked; once a limit is reached, `apply` still works,
+  just without AI.
+- `usage` (shell, or `python -m brain usage`) shows spending today, this month and in
+  total, per model. `cost` shows the current shell session. In the shell, `model`
+  shows or changes the models (`model deepseek:deepseek-chat`, `model off`, `model config`).
+
+In a test run, one application cost about $0.001 with DeepSeek, and $0.0003 once the
+bank was cached. Estimates come from [brain/llm/pricing.yaml](brain/llm/pricing.yaml):
+check it against your providers' billing pages now and then.
+
+```bash
+make apply COMPANY="Company X" OFFER=offer.txt MODEL=deepseek:deepseek-chat   # one model for both jobs
+make apply COMPANY="Company X" OFFER=offer.txt NOAI=1                        # keywords only
+```
+
+**Fitting one page.** Either way, it then drops the weakest bullets if the page overflows,
+or, if there's room left, adds the next most relevant bullets and projects one at a time,
+keeping each one that still fits on one page in both languages (`--no-fill` skips this).
+
+The result is a starting point. Edit `selection.yaml` if you disagree, then rebuild:
+
+```bash
+make tailor SEL=cv/company/company-x/selection.yaml
+```
+
+Other commands: `make catalog` lists everything in the bank, and `python -m brain --help`
+shows all options.
+
+```
+brain/
+  bank/      the content (bank/*.md) and Selection: what goes on one resume
+  offer/     a job offer: facts checked against its text, job.json, already applied?
+  pick/      choose content for an offer (keywords or LLM), fit it on one page
+  render/    selection -> LaTeX -> PDF
+  llm/       one client per provider, fallback chain, spending log and budget
+  app/       the CLI, the `apply` pipeline step by step, the ninurta> shell
+  paths.py   where everything lives
+  config.py  reads config.yaml / environment: models per job, budget, API keys
+  errors.py  BankError, LatexError
+```
+
+Each folder's `__init__.py` lists what its files do; `brain/__init__.py` has the overall map.
+
 ## Editing
 
-I use Neovim with [vimtex](https://github.com/lervag/vimtex) and the `texlab` language server.
+Content is plain Markdown in `bank/`, so any editor works for it; run `make watch` alongside
+to see the PDF update as you save. For the LaTeX side (the class file), I use Neovim with
+[vimtex](https://github.com/lervag/vimtex) and the `texlab` language server.
 The config I use is in [extras/nvim/latex.lua](extras/nvim/latex.lua); drop it into a lazy.nvim
-setup if you want the same thing. Any editor works, though, since everything goes through `latexmk`
-and the repo's `.latexmkrc`.
-
-The one rule: **keep it to one page.** `make check` will complain if it isn't.
+setup if you want the same thing.
 
 ## Using it as a template
 
-Feel free to borrow the class file and structure. Please swap out my personal details before
-sending it anywhere.
+Feel free to borrow the class file, the bank format and the code. Please swap out my
+personal details before sending a resume anywhere.
 
 ## License
 
-The code (class file, Makefile, scripts, configs) is under the [MIT License](LICENSE).
+The code (class file, Python, Makefile, scripts, configs) is under the [MIT License](LICENSE).
 The resume content itself is about me, so please don't reuse that part as your own.

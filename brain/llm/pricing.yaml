@@ -1,0 +1,27 @@
+# $ per 1M tokens, used to estimate what each run costs.
+#   input        normal input tokens
+#   cached_input input the provider served from its cache (a prompt beginning it
+#                saw recently); falls back to `input` if not given
+#   output       output tokens, thinking included (that's how both providers bill it)
+#
+# Prices change often, and third-party trackers disagree. These are a starting
+# point (checked 2026-11-18, NOT confirmed on the official pages). Check and fix:
+#   Gemini:   https://ai.google.dev/gemini-api/docs/pricing
+#   DeepSeek: https://api-docs.deepseek.com/quick_start/pricing
+# Compare `usage` in the shell with your providers' billing pages after a few days.
+#
+# A model name also matches any longer name that starts with it,
+# e.g. "gemini-2.5-flash" covers "gemini-2.5-flash-001".
+
+# Google AI Studio (Gemini). Cached input assumed at 10% of input.
+gemini-3.6-flash:      {input: 0.75,  cached_input: 0.075,  output: 3.75}
+gemini-3.1-pro:        {input: 2.00,  cached_input: 0.20,   output: 12.00}
+gemini-2.5-pro:        {input: 1.25,  cached_input: 0.125,  output: 10.00}
+gemini-2.5-flash:      {input: 0.30,  cached_input: 0.03,   output: 2.50}
+gemini-2.5-flash-lite: {input: 0.10,  cached_input: 0.01,   output: 0.40}
+
+# DeepSeek
+deepseek-chat:         {input: 0.14,  cached_input: 0.0028, output: 0.28}
+deepseek-reasoner:     {input: 0.14,  cached_input: 0.0028, output: 0.28}
+deepseek-v4-flash:     {input: 0.14,  cached_input: 0.0028, output: 0.28}
+deepseek-v4-pro:       {input: 0.435, cached_input: 0.0036, output: 0.87}

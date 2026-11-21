@@ -14,3 +14,11 @@ CLAUDE.md
 .cursor/
 .cursorrules
 .github/copilot-instructions.md
+
+# Tailored resumes (one folder per job application)
+cv/company/
+__pycache__/
+
+# API keys
+config.yaml
+.env
