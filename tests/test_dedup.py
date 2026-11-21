@@ -2,7 +2,7 @@ import json
 
 import pytest
 
-from brain.dedup import (find_same_job, find_similar_job, find_url, job_key, offer_hash)
+from brain.offer.dedup import (find_same_job, find_similar_job, find_url, job_key, offer_hash)
 
 
 @pytest.mark.parametrize("url", [

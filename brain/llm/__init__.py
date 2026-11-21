@@ -2,6 +2,13 @@
 
     gemini:gemini-3.6-flash
     deepseek:deepseek-chat
+
+    base.py       what every backend shares: usage, cost (pricing.yaml)
+    gemini.py     Google AI Studio
+    deepseek.py   DeepSeek
+    answers.py    reading a model's JSON answer, item by item
+    fallback.py   which model does a job, fallback model, budget stop
+    usage.py      spending log (cv/company/.usage.jsonl) and budget checks
 """
 from __future__ import annotations
 

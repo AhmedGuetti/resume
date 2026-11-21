@@ -1,7 +1,8 @@
 import pytest
 
 from brain.bank import usable, variant_base
-from brain.match import add, fill_candidates, mentions, select, shrink, skill_keywords, undo
+from brain.pick.fit import add, fill_candidates, shrink, undo
+from brain.pick.keywords import mentions, select, skill_keywords
 
 OFFER = """Machine Learning Engineer - NLP
 We build LLM agents with LangGraph and Python. You will write tests, run CI/CD

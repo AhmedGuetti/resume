@@ -16,11 +16,15 @@ import shutil
 import subprocess
 from datetime import datetime
 
+from .. import paths
+from ..bank import LANGS
+from ..config import task_models
+from ..paths import show
+from ..render.pdf import pdf_path
 from . import cli
-from .bank import ROOT
-from .config import task_models
+from .terminal import print_job
 
-HISTORY_FILE = ROOT / "build" / ".shell_history"
+HISTORY_FILE = paths.BUILD / ".shell_history"
 
 
 class Shell(cmd.Cmd):
@@ -50,9 +54,9 @@ class Shell(cmd.Cmd):
             print("\ninterrupted")
 
     def companies(self) -> list[str]:
-        if not cli.COMPANIES.exists():
+        if not paths.COMPANIES.exists():
             return []
-        return sorted(p.name for p in cli.COMPANIES.iterdir() if p.is_dir())
+        return sorted(p.name for p in paths.COMPANIES.iterdir() if p.is_dir())
 
     def complete_company(self, text, *_):
         return [c for c in self.companies() if c.startswith(text)]
@@ -81,8 +85,8 @@ class Shell(cmd.Cmd):
         Rebuild PDFs from a selection file (after editing it by hand).
         A company name works too: build company-x"""
         args = shlex.split(line) if line.strip() else []
-        if args and not args[0].endswith((".yaml", ".yml")) and (cli.COMPANIES / args[0]).is_dir():
-            args[0] = str(cli.COMPANIES / args[0] / "selection.yaml")
+        if args and not args[0].endswith((".yaml", ".yml")) and (paths.COMPANIES / args[0]).is_dir():
+            args[0] = str(paths.COMPANIES / args[0] / "selection.yaml")
         self.run("build", shlex.join(args))
 
     complete_build = complete_company
@@ -94,16 +98,16 @@ class Shell(cmd.Cmd):
         if not name:
             print("usage: show COMPANY")
             return
-        from .models import JobRecord
+        from ..offer.record import JobRecord
         try:
-            record = JobRecord.load(cli.COMPANIES / name / "job.json")
+            record = JobRecord.load(paths.COMPANIES / name / "job.json")
         except ValueError as e:
             print(f"can't read it: {e}")
             return
         if record is None:
             print(f"no job.json for '{name}'")
             return
-        cli.print_job(record)
+        print_job(record)
         for field in ("seniority", "experience_years", "education", "start_date", "duration",
                       "recruiter", "url", "source"):
             if getattr(record, field):
@@ -123,13 +127,13 @@ class Shell(cmd.Cmd):
     def do_list(self, line: str) -> None:
         """list
         Applications in cv/company/, newest first."""
-        folders = [cli.COMPANIES / c for c in self.companies()]
+        folders = [paths.COMPANIES / c for c in self.companies()]
         if not folders:
             print("No applications yet. Start with: apply \"Company name\"")
             return
         folders.sort(key=lambda p: p.stat().st_mtime, reverse=True)
         for folder in folders:
-            pdfs = " ".join(lang for lang in cli.LANGS if cli.pdf_path(folder, lang).exists())
+            pdfs = " ".join(lang for lang in LANGS if pdf_path(folder, lang).exists())
             when = datetime.fromtimestamp(folder.stat().st_mtime)
             print(f"  {when:%Y-%m-%d %H:%M}  {folder.name:<30} {pdfs or '(no PDF yet)'}")
 
@@ -141,9 +145,9 @@ class Shell(cmd.Cmd):
             print("usage: open COMPANY [en|fr]")
             return
         lang = args[1] if len(args) > 1 else "en"
-        pdf = cli.pdf_path(cli.COMPANIES / args[0], lang)
+        pdf = pdf_path(paths.COMPANIES / args[0], lang)
         if not pdf.exists():
-            print(f"no such file: {cli.show(pdf)}")
+            print(f"no such file: {show(pdf)}")
             return
         if shutil.which("wslview"):
             subprocess.run(["wslview", str(pdf)])
@@ -167,7 +171,7 @@ class Shell(cmd.Cmd):
         if value in ("off", "config"):
             self.override = None if value == "config" else "off"
         elif value:
-            from .llm import get_llm
+            from ..llm import get_llm
             try:
                 get_llm(value)                # just checks the id is valid
             except ValueError as e:
@@ -185,7 +189,7 @@ class Shell(cmd.Cmd):
     def do_cost(self, line: str) -> None:
         """cost
         What the LLM calls made in this session cost (estimate)."""
-        from .usage import entries
+        from ..llm.usage import entries
         calls = [e for e in entries() if e.get("at", "") >= self.started]
         total = sum(e.get("cost") or 0 for e in calls)
         unknown = sum(1 for e in calls if e.get("cost") is None)
@@ -195,7 +199,7 @@ class Shell(cmd.Cmd):
     def do_usage(self, line: str) -> None:
         """usage
         LLM spending today / this month / all time per model, and your budget."""
-        from .usage import report
+        from ..llm.usage import report
         print(report())
 
     def do_exit(self, line: str) -> bool:

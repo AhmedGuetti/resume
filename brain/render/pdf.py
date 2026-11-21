@@ -1,4 +1,10 @@
-"""Write the .tex for a selection and compile it to PDF with latexmk."""
+"""Write the .tex for a selection and compile it to PDF with latexmk.
+
+An output folder looks like this (a tailored resume, or build/selections/<name>/):
+
+    tex/resume-en.tex   the LaTeX source (LaTeX's own temporary files go in tex/.build/)
+    pdf/resume-en.pdf   the result
+"""
 from __future__ import annotations
 
 import re
@@ -7,13 +13,37 @@ import subprocess
 import sys
 from pathlib import Path
 
-from .bank import ROOT
+from ..bank import Selection
+from ..errors import LatexError
+from ..paths import ROOT, show
 from .latex import render
-from .models import Selection
 
 
-class LatexError(Exception):
-    pass
+def tex_dir(out_dir: Path) -> Path:
+    return out_dir / "tex"
+
+
+def pdf_dir(out_dir: Path) -> Path:
+    return out_dir / "pdf"
+
+
+def pdf_path(out_dir: Path, lang: str) -> Path:
+    return pdf_dir(out_dir) / f"resume-{lang}.pdf"
+
+
+def build_all(bank: dict, sel: Selection, out_dir: Path, langs, pdf: bool = True,
+              tex_out: Path | None = None) -> dict[str, int]:
+    """Write every language's .tex into out_dir/tex/ (or tex_out) and compile it into
+    out_dir/pdf/. Returns {lang: pages}; pages is 0 with pdf=False."""
+    pages = {}
+    for lang in langs:
+        tex_path = write_tex(bank, sel, lang, tex_out or tex_dir(out_dir))
+        if pdf:
+            _, pages[lang] = compile_pdf(tex_path, pdf_dir(out_dir))
+        else:
+            pages[lang] = 0
+            print(f"-> {show(tex_path)}")
+    return pages
 
 
 def write_tex(bank: dict, sel: Selection, lang: str, tex_dir: Path) -> Path:
@@ -43,10 +73,3 @@ def page_count(pdf: Path) -> int:
     info = subprocess.run(["pdfinfo", str(pdf)], capture_output=True, text=True).stdout
     return int(re.search(r"^Pages:\s+(\d+)", info, re.M).group(1))
 
-
-def show(path: Path) -> str:
-    """Path relative to the repo when possible, for nicer messages."""
-    try:
-        return str(path.relative_to(ROOT))
-    except ValueError:
-        return str(path)

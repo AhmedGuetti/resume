@@ -1,8 +1,7 @@
 import pytest
 
-from brain.bank import BankError
-from brain.latex import date_range, render, tex
-from brain.models import Selection
+from brain.bank import BankError, Selection
+from brain.render.latex import date_range, render, tex
 
 
 @pytest.mark.parametrize("text, expected", [

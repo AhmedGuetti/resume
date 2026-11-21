@@ -24,9 +24,8 @@ from functools import lru_cache
 
 import yaml
 
-from .bank import ROOT
+from .paths import CONFIG_FILE
 
-CONFIG_FILE = ROOT / "config.yaml"
 ENV_KEYS = {
     "gemini": ["GEMINI_API_KEY", "GOOGLE_API_KEY"],
     "deepseek": ["DEEPSEEK_API_KEY"],

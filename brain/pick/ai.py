@@ -8,19 +8,22 @@ Everything it returns is checked against the bank. Unknown ids are dropped (and
 reported), and any entry it forgot falls back to the keyword pick, so a bad
 answer can make the resume worse but never break it.
 
-The result has the same shape as match.select(), so the shrink/fill steps in
-cli.py work unchanged: bullets the model chose get high scores (first = best),
-everything else keeps its keyword score for filling leftover space.
+The result has the same shape as keywords.select(), so fit.py works unchanged:
+bullets the model chose get high scores (first = best), everything else keeps
+its keyword score for filling leftover space.
 """
 from __future__ import annotations
 
 import json
-import re
+from typing import Any
 
-from .bank import usable, variant_base
-from .llm import LLM
-from .match import select as keyword_select
-from .models import BulletKey, EntryPick, MatchReport, SelectAnswer, Selection
+from pydantic import BaseModel, Field
+
+from ..bank import ENTRY_SECTIONS, EntryPick, Selection, usable, variant_base
+from ..llm import LLM
+from ..llm.answers import lenient_list, parse_json
+from .keywords import select as keyword_select
+from .report import BulletKey, MatchReport
 
 SYSTEM = """\
 You tailor a candidate's one-page resume to a job offer by CHOOSING content \
@@ -66,20 +69,42 @@ def bank_for_prompt(bank: dict) -> str:
     return json.dumps(data, ensure_ascii=False, indent=1)
 
 
-def parse_json(text: str) -> dict:
-    """Models sometimes wrap JSON in ``` fences or add a sentence; dig it out."""
-    text = re.sub(r"^```(?:json)?\s*|\s*```$", "", text.strip())
-    try:
-        return json.loads(text)
-    except json.JSONDecodeError:
-        start, end = text.find("{"), text.rfind("}")
-        if start == -1 or end <= start:
-            raise ValueError(f"model did not return JSON:\n{text[:500]}") from None
-        return json.loads(text[start:end + 1])
+# ---------- the model's answer ----------
 
+class LLMEntryPick(BaseModel):
+    id: str
+    bullets: list[str] = Field(default_factory=list)
+
+
+class LLMSkillPick(BaseModel):
+    id: str
+    items: list[str] = Field(default_factory=list)
+
+
+class SelectAnswer(BaseModel):
+    experience: list[LLMEntryPick] = Field(default_factory=list)
+    education: list[LLMEntryPick] = Field(default_factory=list)
+    projects: list[LLMEntryPick] = Field(default_factory=list)
+    skills: list[LLMSkillPick] = Field(default_factory=list)
+    why: str = ""
+
+    @classmethod
+    def parse(cls, data: Any) -> tuple[SelectAnswer, list[str]]:
+        """Lenient: a malformed item is dropped and reported, the rest is kept."""
+        warnings: list[str] = []
+        if not isinstance(data, dict):
+            return cls(), [f"malformed answer: expected an object, got {type(data).__name__}"]
+        answer = cls(
+            **{s: lenient_list(LLMEntryPick, data.get(s), s, warnings) for s in ENTRY_SECTIONS},
+            skills=lenient_list(LLMSkillPick, data.get("skills"), "skills", warnings),
+            why=str(data.get("why") or "").strip())
+        return answer, warnings
+
+
+# ---------- picking ----------
 
 def select(bank: dict, offer: str, default: Selection, llm: LLM) -> tuple[Selection, MatchReport]:
-    """Same contract as match.select(): returns (selection, report)."""
+    """Same contract as keywords.select(): returns (selection, report)."""
     sel, report = keyword_select(bank, offer, default)        # fallback + scores for filling
     # The bank goes in the system prompt, right after the fixed instructions: that
     # beginning is identical for every offer, so providers serve it from their cache.

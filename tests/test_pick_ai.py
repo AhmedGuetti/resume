@@ -1,6 +1,7 @@
 import pytest
 
-from brain.ai_match import bank_for_prompt, parse_json, select
+from brain.llm.answers import parse_json
+from brain.pick.ai import bank_for_prompt, select
 from brain.bank import usable
 
 OFFER = "ML Engineer: LLM agents, Python, testing, CI/CD."

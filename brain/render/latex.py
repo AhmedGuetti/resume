@@ -3,8 +3,7 @@ from __future__ import annotations
 
 import re
 
-from .bank import Entry, SkillGroup, BankError, per_lang
-from .models import EntryPick, Selection, SkillPick
+from ..bank import BankError, Entry, EntryPick, Selection, SkillGroup, SkillPick, per_lang
 
 SECTION_TITLES = {
     "en": {"education": "Education", "experience": "Experience",

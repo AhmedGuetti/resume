@@ -1,7 +1,8 @@
 """The bank itself: catches typos and broken conventions before they reach a PDF."""
 import pytest
 
-from brain.bank import BankError, per_lang, split_bilingual, usable, variant_base
+from brain.bank import BankError, per_lang, usable, variant_base
+from brain.bank.loader import split_bilingual
 
 
 def test_split_bilingual():

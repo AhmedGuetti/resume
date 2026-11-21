@@ -72,7 +72,7 @@ class LLM(ABC):
 
     def record(self, input_tokens: int, cached_tokens: int, output_tokens: int, task: str) -> None:
         """Called by each backend after a call: adds up usage and logs the call."""
-        from ..usage import log_call
+        from .usage import log_call
         u = self.usage
         u.calls += 1
         u.input_tokens += input_tokens

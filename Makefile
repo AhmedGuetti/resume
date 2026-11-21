@@ -4,7 +4,7 @@ LANG_  ?= en
 PDFDIR := pdf
 # Content comes from bank/; the main resume is the default selection.
 DEFAULT_SEL := bank/selections/default.yaml
-BANK_SRC    := $(shell find bank -name '*.md') $(DEFAULT_SEL) $(wildcard brain/*.py)
+BANK_SRC    := $(shell find bank -name '*.md') $(DEFAULT_SEL) $(shell find brain -name '*.py')
 
 .PHONY: all $(LANGS) watch view check text clean distclean apply tailor catalog shell
 

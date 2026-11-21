@@ -10,8 +10,8 @@ import json
 
 import pytest
 
-from brain import usage
 from brain.bank import load_bank
+from brain.llm import usage
 
 
 @pytest.fixture(autouse=True)
@@ -26,9 +26,9 @@ def bank():
 
 @pytest.fixture(scope="session")
 def default_sel():
-    from brain.bank import BANK
-    from brain.models import Selection
-    return Selection.load(BANK / "selections" / "default.yaml")
+    from brain.bank import Selection
+    from brain.paths import DEFAULT_SELECTION
+    return Selection.load(DEFAULT_SELECTION)
 
 
 class FakeLLM:

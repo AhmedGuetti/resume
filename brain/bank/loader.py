@@ -7,14 +7,11 @@ from pathlib import Path
 
 import yaml
 
-ROOT = Path(__file__).resolve().parent.parent
-BANK = ROOT / "bank"
+from ..errors import BankError
+from ..paths import BANK, ROOT
+
 LANGS = ("en", "fr")
 SECTION_DIRS = {"education": "education", "experience": "experiences", "projects": "projects"}
-
-
-class BankError(Exception):
-    pass
 
 
 # Bank conventions (see the comment at the top of an experience file):
@@ -26,7 +23,6 @@ def usable(bullet) -> bool:
 
 def variant_base(bullet_id: str) -> str:
     return bullet_id.removesuffix("-short")
-
 
 
 @dataclass

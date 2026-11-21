@@ -10,10 +10,10 @@ import json
 from collections import defaultdict
 from datetime import datetime
 
-from .bank import ROOT
-from .config import budget
+from ..paths import COMPANIES
+from ..config import budget
 
-LEDGER = ROOT / "cv" / "company" / ".usage.jsonl"
+LEDGER = COMPANIES / ".usage.jsonl"
 
 
 def log_call(model_id: str, task: str, input_tokens: int, cached_tokens: int,

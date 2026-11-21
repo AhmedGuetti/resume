@@ -186,20 +186,18 @@ shows all options.
 
 ```
 brain/
-  bank.py      reads bank/*.md
-  models.py    typed shapes of the data (selection, match report, LLM answers, job.json)
-  latex.py     selection -> LaTeX source
-  build.py     LaTeX -> PDF (latexmk), page count
-  match.py     job offer -> selection (keyword matching), plus shrink/fill
-  ai_match.py  job offer -> selection (LLM), checked against the bank
-  offer.py     job offer -> job.json (facts, each checked against the offer text)
-  dedup.py     already applied? (job link ids, offer text, company + title)
-  config.py    reads config.yaml / environment: models per job, budget, API keys
-  usage.py     spending log (cv/company/.usage.jsonl) and budget checks
-  llm/         one small client per provider (gemini.py, deepseek.py), usage and cost
-  cli.py       the commands: apply, build, catalog
-  shell.py     the interactive `ninurta>` shell (Python's built-in cmd module)
+  bank/      the content (bank/*.md) and Selection: what goes on one resume
+  offer/     a job offer: facts checked against its text, job.json, already applied?
+  pick/      choose content for an offer (keywords or LLM), fit it on one page
+  render/    selection -> LaTeX -> PDF
+  llm/       one client per provider, fallback chain, spending log and budget
+  app/       the CLI, the `apply` pipeline step by step, the ninurta> shell
+  paths.py   where everything lives
+  config.py  reads config.yaml / environment: models per job, budget, API keys
+  errors.py  BankError, LatexError
 ```
+
+Each folder's `__init__.py` lists what its files do; `brain/__init__.py` has the overall map.
 
 ## Editing
 

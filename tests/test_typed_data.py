@@ -3,8 +3,9 @@ import json
 
 import pytest
 
-from brain.bank import BankError
-from brain.models import JobRecord, SelectAnswer, Selection
+from brain.bank import BankError, Selection
+from brain.offer.record import JobRecord
+from brain.pick.ai import SelectAnswer
 
 
 # ---------- Selection: hand-written, so strict ----------

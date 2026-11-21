@@ -2,8 +2,9 @@ from datetime import date
 
 import pytest
 
-from brain.offer import (extract, in_offer, parse_applicants, parse_posted, parse_salary,
-                         to_record)
+from brain.offer.facts import extract
+from brain.offer.parsing import in_offer, parse_applicants, parse_posted, parse_salary
+from brain.offer.record import to_record
 
 TODAY = date(2026, 11, 21)
 

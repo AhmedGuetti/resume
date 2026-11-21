@@ -15,7 +15,7 @@ import re
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
-from .models import JobRecord
+from .record import JobRecord
 
 # Query parameters that identify a job on some sites; every other parameter is tracking noise.
 ID_PARAMS = ("currentJobId", "jobId", "gh_jid", "jk", "vjk", "job_id", "id")
