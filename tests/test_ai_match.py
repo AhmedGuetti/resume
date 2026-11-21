@@ -53,16 +53,30 @@ def test_made_up_ids_are_dropped_and_reported(bank, default_sel, fake_llm):
     })
     sel, report = select(bank, OFFER, default_sel, llm)
 
-    entry = next(e for e in sel["experience"] if e["id"] == eid)
-    assert entry["bullets"] == bullets
-    assert "invented-company" not in {e["id"] for e in sel["experience"]}
-    assert sel["projects"] and "invented-project" not in {p["id"] for p in sel["projects"]}
-    w = "\n".join(report["warnings"])
+    entry = sel.entry("experience", eid)
+    assert entry.bullets == bullets
+    assert "invented-company" not in {e.id for e in sel.experience}
+    assert sel.projects and "invented-project" not in {p.id for p in sel.projects}
+    w = "\n".join(report.warnings)
     assert "invented-bullet" in w and "invented-company" in w and "invented-project" in w and "COBOL" in w
-    assert report["why"] == "because"
+    assert report.why == "because"
 
-    languages = next(g for g in sel["skills"] if g["id"] == "languages")
-    assert languages["items"] == ["Python"]
+    languages = next(g for g in sel.skills if g.id == "languages")
+    assert languages.items == ["Python"]
+
+
+def test_malformed_items_are_dropped_not_fatal(bank, default_sel, fake_llm):
+    eid, bullets = _pick(bank, "experience", 1)
+    llm = fake_llm({"experience": ["just-a-string", {"bullets": ["no id"]},
+                                   {"id": eid, "bullets": bullets}],
+                    "projects": "not a list", "skills": [{"id": "languages", "items": "Python"}],
+                    "why": None})
+    sel, report = select(bank, OFFER, default_sel, llm)
+    assert sel.entry("experience", eid).bullets == bullets
+    assert sel.projects                                    # keyword pick kept
+    w = "\n".join(report.warnings)
+    assert w.count("malformed") == 4
+    assert report.why == ""
 
 
 def test_unconfirmed_and_twin_bullets_are_refused(bank, default_sel, fake_llm):
@@ -79,11 +93,11 @@ def test_unconfirmed_and_twin_bullets_are_refused(bank, default_sel, fake_llm):
 
     sel, report = select(bank, OFFER, default_sel, fake_llm(answer))
 
-    picked = {(s, e["id"]): e["bullets"] for s in ("education", "experience", "projects") for e in sel[s]}
+    picked = {(s, e.id): e.bullet_ids() for s in ("education", "experience", "projects") for e in sel.entries(s)}
     assert todo not in picked.get((section, eid), [])
     twin_pick = picked.get((section2, eid2), [])
     assert not (short in twin_pick and short[:-6] in twin_pick)
-    w = "\n".join(report["warnings"])
+    w = "\n".join(report.warnings)
     assert "to-confirm" in w and "other variant" in w
 
 
@@ -92,8 +106,8 @@ def test_model_picks_outrank_keyword_scores(bank, default_sel, fake_llm):
     llm = fake_llm({"experience": [{"id": eid, "bullets": bullets}],
                     "education": [], "projects": [], "skills": [], "why": ""})
     _, report = select(bank, OFFER, default_sel, llm)
-    assert report["bullets"][("experience", eid, bullets[0])] == 100
-    assert report["bullets"][("experience", eid, bullets[1])] == 99
+    assert report.bullets[("experience", eid, bullets[0])] == 100
+    assert report.bullets[("experience", eid, bullets[1])] == 99
 
 
 def test_bank_is_in_system_prompt_and_offer_in_user(bank, default_sel, fake_llm):

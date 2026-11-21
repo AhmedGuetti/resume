@@ -113,10 +113,24 @@ def test_to_record_parses_numbers_next_to_the_raw_text():
     info["salary"] = "45-55k€ per year"
     record = to_record(info, offer_file="offer.md", user_fields=["salary"], notes=[],
                        model=None, source="linkedin")
-    assert record["salary"]["text"] == "45-55k€ per year"
-    assert record["salary"]["min"] == 45000
-    assert record["applicants"]["count"] == 100
-    assert record["posted"]["date"]
-    assert record["location"] is None
-    assert record["meta"]["typed_by_user"] == ["salary"]
-    assert record["application"]["status"] == "resume ready"
+    assert record.salary.text == "45-55k€ per year"
+    assert record.salary.min == 45000
+    assert record.applicants.count == 100
+    assert record.posted.date
+    assert record.location is None
+    assert record.meta.typed_by_user == ["salary"]
+    assert record.application.status == "resume ready"
+    assert record.application.since() == date.today()
+
+
+def test_extract_survives_malformed_answer(fake_llm):
+    llm = fake_llm({"company": "ACME",                                     # not {value, quote}
+                    "job_title": {"value": 42, "quote": "Machine Learning Engineer"},
+                    "location": {"value": ["Toulouse"], "quote": "Toulouse"},
+                    "skills_required": "Python"})
+    info, notes = extract(OFFER, llm)
+    assert info["company"] is None
+    assert info["job_title"] == "42"
+    assert info["location"] is None
+    assert info["skills_required"] == []
+    assert sum("malformed" in n for n in notes) == 3

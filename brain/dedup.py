@@ -11,10 +11,11 @@ Three checks, from certain to likely:
 from __future__ import annotations
 
 import hashlib
-import json
 import re
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
+
+from .models import JobRecord
 
 # Query parameters that identify a job on some sites; every other parameter is tracking noise.
 ID_PARAMS = ("currentJobId", "jobId", "gh_jid", "jk", "vjk", "job_id", "id")
@@ -67,23 +68,24 @@ def _norm_name(text: str | None) -> str:
 
 
 def all_applications(companies: Path):
-    """(folder, job.json record) for every application that has a job.json."""
+    """(folder, job.json record) for every application that has a readable job.json."""
     if not companies.exists():
         return
     for path in sorted(companies.glob("*/job.json")):
         try:
-            yield path.parent, json.loads(path.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError):
+            record = JobRecord.load(path)
+        except (OSError, ValueError):            # unreadable or not a job.json: skip it
             continue
+        if record is not None:
+            yield path.parent, record
 
 
-def find_same_job(companies: Path, key: str | None, text_hash: str) -> list[tuple[Path, dict, str]]:
+def find_same_job(companies: Path, key: str | None, text_hash: str) -> list[tuple[Path, JobRecord, str]]:
     """Certain duplicates: same job link or same offer text. Returns (folder, record, reason)."""
     hits = []
     for folder, record in all_applications(companies):
-        meta = record.get("meta") or {}
-        their_key = record.get("job_key") or job_key(record.get("url"))
-        their_hash = meta.get("offer_hash")
+        their_key = record.job_key or job_key(record.url)
+        their_hash = record.meta.offer_hash
         if their_hash is None and (folder / "offer.md").exists():          # older folders
             their_hash = offer_hash((folder / "offer.md").read_text(encoding="utf-8"))
         if key and their_key == key:
@@ -94,19 +96,18 @@ def find_same_job(companies: Path, key: str | None, text_hash: str) -> list[tupl
 
 
 def find_similar_job(companies: Path, company: str | None, title: str | None,
-                     skip: Path | None = None) -> list[tuple[Path, dict]]:
+                     skip: Path | None = None) -> list[tuple[Path, JobRecord]]:
     """Likely duplicates: same company and same job title."""
     if not company or not title:
         return []
     want = (_norm_name(company), _norm_name(title))
     return [(folder, record) for folder, record in all_applications(companies)
             if folder != skip
-            and (_norm_name(record.get("company")), _norm_name(record.get("job_title"))) == want]
+            and (_norm_name(record.company), _norm_name(record.job_title)) == want]
 
 
-def describe(folder: Path, record: dict) -> str:
-    app = record.get("application") or {}
-    history = app.get("history") or [{}]
-    when = history[0].get("date") or (record.get("meta") or {}).get("recorded_at", "")[:10]
-    return (f"{folder.name}: {record.get('company')} - {record.get('job_title')} "
-            f"({app.get('status', '?')}, since {when or '?'})")
+def describe(folder: Path, record: JobRecord) -> str:
+    app = record.application
+    when = app.since() or (record.meta.recorded_at.date() if record.meta.recorded_at else None)
+    return (f"{folder.name}: {record.company} - {record.job_title} "
+            f"({app.status}, since {when or '?'})")

@@ -94,21 +94,24 @@ class Shell(cmd.Cmd):
         if not name:
             print("usage: show COMPANY")
             return
-        from .offer import load
-        record = load(cli.COMPANIES / name / "job.json")
+        from .models import JobRecord
+        try:
+            record = JobRecord.load(cli.COMPANIES / name / "job.json")
+        except ValueError as e:
+            print(f"can't read it: {e}")
+            return
         if record is None:
             print(f"no job.json for '{name}'")
             return
         cli.print_job(record)
         for field in ("seniority", "experience_years", "education", "start_date", "duration",
                       "recruiter", "url", "source"):
-            if record.get(field):
-                print(f"   {field:<11} {record[field]}")
+            if getattr(record, field):
+                print(f"   {field:<11} {getattr(record, field)}")
         for field in ("skills_required", "skills_nice_to_have", "responsibilities", "benefits"):
-            if record.get(field):
-                print(f"   {field}: " + "; ".join(record[field]))
-        status = (record.get("application") or {}).get("status")
-        print(f"   status      {status or '-'}")
+            if getattr(record, field):
+                print(f"   {field}: " + "; ".join(getattr(record, field)))
+        print(f"   status      {record.application.status}")
 
     complete_show = complete_company
 

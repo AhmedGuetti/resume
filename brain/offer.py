@@ -19,10 +19,11 @@ import json
 import re
 import sys
 from datetime import date, datetime, timedelta
-from pathlib import Path
 
 from .ai_match import parse_json
 from .llm import LLM
+from .models import (Applicants, Application, ExtractAnswer, JobRecord, Meta, Posted,
+                     Salary, StatusChange)
 
 # Facts with one value each. The model returns {"value": ..., "quote": "..."} for these.
 SCALAR_FIELDS = {
@@ -189,25 +190,23 @@ def extract(offer: str, llm: LLM | None) -> tuple[dict, list[str]]:
     """Returns (info, notes). info holds plain values; notes say what was thrown away."""
     info, notes = empty_info(), []
     if llm is not None:
-        answer = parse_json(llm.complete(SYSTEM, f"JOB OFFER:\n{offer.strip()}",
-                                         json_output=True, task="extract"))
-        for field in SCALAR_FIELDS:
-            item = answer.get(field)
-            if not isinstance(item, dict) or item.get("value") in (None, "", []):
-                continue
-            if field in NO_QUOTE or in_offer(item.get("quote"), offer):
+        answer, notes = ExtractAnswer.parse(
+            parse_json(llm.complete(SYSTEM, f"JOB OFFER:\n{offer.strip()}", json_output=True, task="extract")),
+            SCALAR_FIELDS, LIST_FIELDS)
+        for name, fact in answer.facts.items():
+            if name in NO_QUOTE or in_offer(fact.quote, offer):
                 # for these three we keep the offer's own words; the numbers are parsed later
-                info[field] = item["quote"] if field in ("salary", "posted", "applicants") else item["value"]
+                info[name] = fact.quote if name in ("salary", "posted", "applicants") else str(fact.value)
             else:
-                notes.append(f"dropped {field} = {item.get('value')!r}: not found in the offer")
-        for field in LIST_FIELDS:
+                notes.append(f"dropped {name} = {fact.value!r}: not found in the offer")
+        for name, phrases in answer.lists.items():
             kept = []
-            for phrase in answer.get(field) or []:
+            for phrase in phrases:
                 if in_offer(phrase, offer):
-                    kept.append(str(phrase).strip())
+                    kept.append(phrase.strip())
                 else:
-                    notes.append(f"dropped from {field}: {phrase!r} (not in the offer)")
-            info[field] = kept
+                    notes.append(f"dropped from {name}: {phrase!r} (not in the offer)")
+            info[name] = kept
 
     # Posting date and applicants: plain patterns work even without an LLM.
     if not info["posted"]:
@@ -241,41 +240,22 @@ def ask_missing(info: dict, fields=ASK_FIELDS) -> list[str]:
 
 
 def to_record(info: dict, *, offer_file: str, user_fields: list[str], notes: list[str],
-              model: str | None, source: str | None) -> dict:
+              model: str | None, source: str | None) -> JobRecord:
     """The job.json content: raw text as found, plus parsed numbers/dates next to it."""
-    record = {
-        "company": info.get("company"),
-        "job_title": info.get("job_title"),
-        "location": info.get("location"),
-        "work_mode": info.get("work_mode"),
-        "contract_type": info.get("contract_type"),
-        "seniority": info.get("seniority"),
-        "experience_years": info.get("experience_years"),
-        "education": info.get("education"),
-        "language": info.get("language"),
-        "salary": {"text": info.get("salary"), **(parse_salary(info.get("salary")) or {})}
-                  if info.get("salary") else None,
-        "posted": {"text": info.get("posted"), "date": parse_posted(info.get("posted"))}
-                  if info.get("posted") else None,
-        "applicants": {"text": info.get("applicants"), **(parse_applicants(info.get("applicants")) or {})}
-                      if info.get("applicants") else None,
-        "start_date": info.get("start_date"),
-        "duration": info.get("duration"),
-        "recruiter": info.get("recruiter"),
-        "url": info.get("url"),
-        "source": source,
+    salary, posted, applicants = info.get("salary"), info.get("posted"), info.get("applicants")
+    return JobRecord(
+        **{k: info.get(k) for k in ("company", "job_title", "location", "work_mode", "contract_type",
+                                    "seniority", "experience_years", "education", "language",
+                                    "start_date", "duration", "recruiter", "url")},
+        salary=Salary(text=salary, **(parse_salary(salary) or {})) if salary else None,
+        posted=Posted(text=posted, date=parse_posted(posted)) if posted else None,
+        applicants=Applicants(text=applicants, **(parse_applicants(applicants) or {})) if applicants else None,
+        source=source,
         **{k: info.get(k) or [] for k in LIST_FIELDS},
-        "meta": {
-            "recorded_at": datetime.now().isoformat(timespec="seconds"),
-            "offer_file": offer_file,
-            "extracted_by": model or "patterns only (no AI)",
-            "typed_by_user": user_fields,
-            "dropped": notes,
-        },
-        "application": {"status": "resume ready", "history": [
-            {"status": "resume ready", "date": date.today().isoformat()}]},
-    }
-    return record
+        meta=Meta(recorded_at=datetime.now().replace(microsecond=0), offer_file=offer_file,
+                  extracted_by=model or "patterns only (no AI)", typed_by_user=user_fields, dropped=notes),
+        application=Application(history=[StatusChange(status="resume ready", date=date.today())]),
+    )
 
 
 def guess_source(offer: str, url: str | None) -> str | None:
@@ -285,11 +265,3 @@ def guess_source(offer: str, url: str | None) -> str | None:
         if name in text:
             return "welcome to the jungle" if name == "welcometothejungle" else name
     return None
-
-
-def save(record: dict, path: Path) -> None:
-    path.write_text(json.dumps(record, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-
-
-def load(path: Path) -> dict | None:
-    return json.loads(path.read_text(encoding="utf-8")) if path.exists() else None

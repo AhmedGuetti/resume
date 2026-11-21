@@ -26,6 +26,7 @@ PKGS=(
   poppler                    # pdftotext / pdfinfo (used by make text / check)
   make git
   python-yaml                # PyYAML, for the brain package
+  python-pydantic            # typed models (brain/models.py)
 )
 (( FULL )) && PKGS+=(texlive-fontsextra)
 

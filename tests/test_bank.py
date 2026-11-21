@@ -51,8 +51,8 @@ def test_short_variants_have_a_base(bank):
 
 
 def _picked(default_sel, section):
-    for pick in default_sel.get(section) or []:
-        yield (pick, None) if isinstance(pick, str) else (pick["id"], pick.get("bullets"))
+    for pick in default_sel.entries(section):
+        yield pick.id, (pick.bullet_ids() if pick.bullets is not None else None)
 
 
 def test_default_selection_ships_only_confirmed_bullets(bank, default_sel):

@@ -29,16 +29,13 @@ from .bank import BANK, LANGS, ROOT, SECTION_DIRS, BankError, load_bank, per_lan
 from .build import LatexError, compile_pdf, show, write_tex
 from .config import task_models
 from .match import add, fill_candidates, select, shrink, undo
+from .models import JobRecord, Selection
 
 DEFAULT_SELECTION = BANK / "selections" / "default.yaml"
 COMPANIES = ROOT / "cv" / "company"
 MAX_FILL_MISSES = 3        # stop filling after this many tries in a row don't fit
 FALLBACK_AFTER_DROPPED = 4  # extract: this many facts not found in the offer -> try the fallback model
 FALLBACK_AFTER_UNKNOWN = 3  # select: this many made-up ids -> try the fallback model
-
-
-def load_yaml(path: Path) -> dict:
-    return yaml.safe_load(path.read_text(encoding="utf-8")) or {}
 
 
 def slugify(name: str) -> str:
@@ -59,7 +56,7 @@ def pdf_path(out_dir: Path, lang: str) -> Path:
     return pdf_dir(out_dir) / f"resume-{lang}.pdf"
 
 
-def build_all(bank: dict, sel: dict, out_dir: Path, langs, pdf: bool = True,
+def build_all(bank: dict, sel: Selection, out_dir: Path, langs, pdf: bool = True,
               tex_out: Path | None = None) -> dict[str, int]:
     """Write every language's .tex into out_dir/tex/ (or tex_out) and compile it into
     out_dir/pdf/. Returns {lang: pages}; pages is 0 with pdf=False."""
@@ -112,17 +109,17 @@ def unique_folder(slug: str) -> Path:
     return folder
 
 
-def print_job(record: dict) -> None:
+def print_job(record: JobRecord) -> None:
     def show_field(label, value):
         print(f"   {label:<11} {value if value not in (None, '', []) else '-'}")
-    show_field("company", record.get("company"))
-    show_field("title", record.get("job_title"))
-    show_field("location", " / ".join(x for x in (record.get("location"), record.get("work_mode")) if x) or None)
-    show_field("contract", record.get("contract_type"))
-    show_field("salary", (record.get("salary") or {}).get("text"))
-    posted = record.get("posted") or {}
-    show_field("posted", f"{posted.get('text')} ({posted['date']})" if posted.get("date") else posted.get("text"))
-    show_field("applicants", (record.get("applicants") or {}).get("text"))
+    show_field("company", record.company)
+    show_field("title", record.job_title)
+    show_field("location", " / ".join(x for x in (record.location, record.work_mode) if x) or None)
+    show_field("contract", record.contract_type)
+    show_field("salary", record.salary and record.salary.text)
+    posted = record.posted
+    show_field("posted", posted and (f"{posted.text} ({posted.date})" if posted.date else posted.text))
+    show_field("applicants", record.applicants and record.applicants.text)
 
 
 def confirm(question: str) -> bool:
@@ -222,7 +219,7 @@ def cmd_apply(args) -> int:
     llms: dict = {}                              # every model used in this run, for the cost lines
 
     # 3. The facts of the offer (company, salary, date, applicants, ...) -> job.json.
-    record = job.load(named / "job.json") if named and new_text is None else None
+    record = JobRecord.load(named / "job.json") if named and new_text is None else None
     if record is None:
         chain = model_chain("extract", args)
         print(f"Reading the offer{' with ' + chain[0] if chain else ''} ...")
@@ -253,10 +250,10 @@ def cmd_apply(args) -> int:
             return 1
         record = job.to_record(info, offer_file="offer.md", user_fields=typed, notes=notes,
                                model=extracted_by, source=job.guess_source(offer, info.get("url")))
-        record["job_key"] = key
-        record["meta"]["offer_hash"] = dedup.offer_hash(offer)
+        record.job_key = key
+        record.meta.offer_hash = dedup.offer_hash(offer)
 
-        similar = dedup.find_similar_job(COMPANIES, record["company"], record["job_title"], skip=named)
+        similar = dedup.find_similar_job(COMPANIES, record.company, record.job_title, skip=named)
         if similar and not args.force:
             print("Same company and job title as (a repost?):")
             for folder_, record_ in similar:
@@ -269,15 +266,15 @@ def cmd_apply(args) -> int:
     if named and new_text is None:
         folder = named
     else:
-        folder = unique_folder(slugify(args.company or record["company"]))
+        folder = unique_folder(slugify(args.company or record.company))
     folder.mkdir(parents=True, exist_ok=True)
     (folder / "offer.md").write_text(offer, encoding="utf-8")
-    job.save(record, folder / "job.json")
+    record.save(folder / "job.json")
     print_job(record)
 
     # 4. Pick the resume content.
     bank = load_bank()
-    default = load_yaml(DEFAULT_SELECTION)
+    default = Selection.load(DEFAULT_SELECTION)
     chain = model_chain("select", args)
     result = None
     if chain:
@@ -286,7 +283,7 @@ def cmd_apply(args) -> int:
 
         def select_with(llm):
             sel_, report_ = ai_select(bank, offer, default, llm)
-            unknown = [w for w in report_["warnings"] if w.startswith("unknown")]
+            unknown = [w for w in report_.warnings if w.startswith(("unknown", "malformed"))]
             if len(unknown) >= FALLBACK_AFTER_UNKNOWN:
                 return (sel_, report_), f"{len(unknown)} made-up ids"
             return (sel_, report_), None
@@ -294,11 +291,11 @@ def cmd_apply(args) -> int:
         result = run_llm_task("select", chain, select_with, llms, label=folder.name)
     if result:
         sel, report = result
-        for warning in report["warnings"]:
+        for warning in report.warnings:
             print(f"   note: {warning}")
     else:
         sel, report = select(bank, offer, default)
-        print(f"Matched keywords ({len(report['found'])}): {', '.join(report['found']) or 'none'}")
+        print(f"Matched keywords ({len(report.found)}): {', '.join(report.found) or 'none'}")
     used = [l for l in llms.values() if l.usage.calls]
     for l in used:
         print(f"   {l.usage_line()}")
@@ -311,7 +308,7 @@ def cmd_apply(args) -> int:
     # 1. Too long? Drop the weakest bullets until it fits.
     pages, dropped = {}, []
     while not fits():
-        gone = shrink(sel, report["bullets"])
+        gone = shrink(sel, report.bullets)
         if not gone:
             print("WARN: still longer than one page and nothing left to drop", file=sys.stderr)
             break
@@ -336,16 +333,16 @@ def cmd_apply(args) -> int:
         if misses:
             fits()                                # rebuild without the last rejected try
 
-    why = textwrap.fill(report.get("why", ""), 86, initial_indent="#   ", subsequent_indent="#   ")
-    header = (f"# Generated by `python -m brain apply` for {record['company']}.\n"
+    why = textwrap.fill(report.why, 86, initial_indent="#   ", subsequent_indent="#   ")
+    header = (f"# Generated by `python -m brain apply` for {record.company}.\n"
               + ("".join(f"# LLM: {l.usage_line()}\n" for l in used) if used else "# No AI used (keyword matching)\n")
               + (f"# Why:\n{why}\n" if why else "")
-              + f"# Matched keywords: {', '.join(report['found']) or 'none'}\n"
+              + f"# Matched keywords: {', '.join(report.found) or 'none'}\n"
               + (f"# Dropped to fit one page: {', '.join(dropped)}\n" if dropped else "")
               + (f"# Added to fill the page: {', '.join(added)}\n" if added else "")
               + "# Edit freely, then rebuild with: python -m brain build " + show(folder / "selection.yaml") + "\n\n")
     (folder / "selection.yaml").write_text(
-        header + yaml.safe_dump(sel, sort_keys=False, allow_unicode=True), encoding="utf-8")
+        header + yaml.safe_dump(sel.to_dict(), sort_keys=False, allow_unicode=True), encoding="utf-8")
 
     for lang in LANGS:
         print(f"-> {show(pdf_path(folder, lang))} ({pages[lang]} page{'s' if pages[lang] > 1 else ''})")
@@ -356,8 +353,8 @@ def cmd_apply(args) -> int:
 
 def cmd_build(args) -> int:
     sel_path = Path(args.selection).resolve()
-    sel = load_yaml(sel_path)
-    langs = [args.lang] if args.lang else sel.get("languages", list(LANGS))
+    sel = Selection.load(sel_path)
+    langs = [args.lang] if args.lang else sel.languages or list(LANGS)
     if args.out:
         out_dir = Path(args.out).resolve()
     elif BANK in sel_path.parents:                 # don't write PDFs into bank/

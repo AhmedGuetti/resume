@@ -187,6 +187,7 @@ shows all options.
 ```
 brain/
   bank.py      reads bank/*.md
+  models.py    typed shapes of the data (selection, match report, LLM answers, job.json)
   latex.py     selection -> LaTeX source
   build.py     LaTeX -> PDF (latexmk), page count
   match.py     job offer -> selection (keyword matching), plus shrink/fill

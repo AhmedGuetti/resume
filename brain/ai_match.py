@@ -20,6 +20,7 @@ import re
 from .bank import usable, variant_base
 from .llm import LLM
 from .match import select as keyword_select
+from .models import BulletKey, EntryPick, MatchReport, SelectAnswer, Selection
 
 SYSTEM = """\
 You tailor a candidate's one-page resume to a job offer by CHOOSING content \
@@ -77,21 +78,19 @@ def parse_json(text: str) -> dict:
         return json.loads(text[start:end + 1])
 
 
-def select(bank: dict, offer: str, default: dict, llm: LLM) -> tuple[dict, dict]:
+def select(bank: dict, offer: str, default: Selection, llm: LLM) -> tuple[Selection, MatchReport]:
     """Same contract as match.select(): returns (selection, report)."""
     sel, report = keyword_select(bank, offer, default)        # fallback + scores for filling
     # The bank goes in the system prompt, right after the fixed instructions: that
     # beginning is identical for every offer, so providers serve it from their cache.
     system = f"{SYSTEM}\nCONTENT BANK:\n{bank_for_prompt(bank)}"
-    answer = parse_json(llm.complete(system, f"JOB OFFER:\n{offer.strip()}",
-                                     json_output=True, task="select"))
+    answer, warnings = SelectAnswer.parse(parse_json(llm.complete(
+        system, f"JOB OFFER:\n{offer.strip()}", json_output=True, task="select")))
 
-    warnings = []
-
-    def checked_bullets(section: str, eid: str, wanted) -> list[str]:
+    def checked_bullets(section: str, eid: str, wanted: list[str]) -> list[str]:
         known = bank[section][eid].bullets
         ok, bases = [], set()
-        for bid in wanted or []:
+        for bid in wanted:
             if bid not in known:
                 warnings.append(f"unknown bullet {section}/{eid}/{bid}")
             elif not usable(known[bid]):
@@ -105,51 +104,50 @@ def select(bank: dict, offer: str, default: dict, llm: LLM) -> tuple[dict, dict]
 
     def model_entries(section: str) -> dict[str, list[str]]:
         picks = {}
-        for item in answer.get(section) or []:
-            eid = item.get("id") if isinstance(item, dict) else None
-            if eid not in bank[section]:
-                warnings.append(f"unknown {section} entry '{eid}'")
+        for item in getattr(answer, section):
+            if item.id not in bank[section]:
+                warnings.append(f"unknown {section} entry '{item.id}'")
                 continue
-            bullets = checked_bullets(section, eid, item.get("bullets"))
+            bullets = checked_bullets(section, item.id, item.bullets)
             if bullets:
-                picks[eid] = bullets
+                picks[item.id] = bullets
         return picks
 
     # experience / education: keep the default order and every entry
     for section in ("experience", "education"):
         picks = model_entries(section)
-        for entry in sel[section]:
-            if entry["id"] in picks:
-                entry["bullets"] = picks[entry["id"]]
+        for entry in sel.entries(section):
+            if entry.id in picks:
+                entry.bullets = picks[entry.id]
             else:
-                warnings.append(f"model skipped {section}/{entry['id']}, kept the keyword pick")
+                warnings.append(f"model skipped {section}/{entry.id}, kept the keyword pick")
 
     # projects: the model's choice and order
     picks = model_entries("projects")
     if picks:
-        sel["projects"] = [{"id": pid, "bullets": bullets} for pid, bullets in picks.items()]
+        sel.projects = [EntryPick(id=pid, bullets=bullets) for pid, bullets in picks.items()]
 
     # skills: same groups as before, items must exist in skills.md
-    model_skills = {s.get("id"): s.get("items") or [] for s in answer.get("skills") or [] if isinstance(s, dict)}
-    for group in sel["skills"]:
-        names = {i["en"].lower(): i["en"] for i in bank["skills"][group["id"]].items}
+    model_skills = {s.id: s.items for s in answer.skills}
+    for group in sel.skills:
+        names = {i["en"].lower(): i["en"] for i in bank["skills"][group.id].items}
         chosen = []
-        for name in model_skills.get(group["id"], []):
-            if str(name).lower() in names:
-                chosen.append(names[str(name).lower()])
+        for name in model_skills.get(group.id, []):
+            if name.lower() in names:
+                chosen.append(names[name.lower()])
             else:
-                warnings.append(f"unknown skill '{name}' in {group['id']}")
+                warnings.append(f"unknown skill '{name}' in {group.id}")
         if chosen:
-            group["items"] = list(dict.fromkeys(chosen))
+            group.items = list(dict.fromkeys(chosen))
 
     # scores: the model's picks rank above anything left for filling
     for section in ("experience", "education", "projects"):
-        for entry in sel[section]:
-            for rank, bid in enumerate(entry["bullets"]):
-                report["bullets"][(section, entry["id"], bid)] = 100 - rank
-    for i, project in enumerate(sel["projects"]):
-        report["projects"][project["id"]] = 100 - i
+        for entry in sel.entries(section):
+            for rank, bid in enumerate(entry.bullet_ids()):
+                report.bullets[BulletKey(section, entry.id, bid)] = 100 - rank
+    for i, project in enumerate(sel.projects):
+        report.projects[project.id] = 100 - i
 
-    report["why"] = str(answer.get("why", "")).strip()
-    report["warnings"] = warnings
+    report.why = answer.why
+    report.warnings = warnings
     return sel, report

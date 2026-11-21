@@ -4,6 +4,7 @@ from __future__ import annotations
 import re
 
 from .bank import Entry, SkillGroup, BankError, per_lang
+from .models import EntryPick, Selection, SkillPick
 
 SECTION_TITLES = {
     "en": {"education": "Education", "experience": "Experience",
@@ -82,15 +83,7 @@ def date_range(meta: dict, lang: str) -> str:
 
 # ---------- whole document ----------
 
-def _as_list(value, where):
-    if value is None:
-        return None
-    if not isinstance(value, list):
-        raise BankError(f"{where}: expected a list")
-    return value
-
-
-def render(bank: dict, sel: dict, lang: str) -> str:
+def render(bank: dict, sel: Selection, lang: str) -> str:
     p = bank["profile"]
     line1 = [tex(p["location"]), tex(p["phone"]),
              rf"\href{{mailto:{p['email']}}}{{{tex(p['email'])}}}"]
@@ -106,10 +99,8 @@ def render(bank: dict, sel: dict, lang: str) -> str:
            rf"\documentclass[{BABEL[lang]}]{{resume}}", "", r"\begin{document}", "",
            rf"\cvheader{{{tex(p['name'])}}}", f"  {{{contact}}}"]
 
-    for section in sel.get("sections", ["education", "experience", "projects", "skills"]):
-        if section not in SECTION_TITLES[lang]:
-            raise BankError(f"unknown section '{section}' (use {', '.join(SECTION_TITLES['en'])})")
-        picks = _as_list(sel.get(section), section) or []
+    for section in sel.sections:
+        picks = sel.entries(section)
         if not picks:
             continue
         out += ["", rf"\section{{{SECTION_TITLES[lang][section]}}}"]
@@ -122,47 +113,38 @@ def render(bank: dict, sel: dict, lang: str) -> str:
     return "\n".join(out)
 
 
-def render_entry(entries: dict[str, Entry], section: str, pick, lang: str) -> list[str]:
-    if isinstance(pick, str):
-        pick = {"id": pick}
-    eid = pick.get("id")
+def render_entry(entries: dict[str, Entry], section: str, pick: EntryPick, lang: str) -> list[str]:
+    eid = pick.id
     if eid not in entries:
         raise BankError(f"{section}: no bank entry '{eid}' (have: {', '.join(entries)})")
     entry = entries[eid]
-    meta = {**entry.meta, **{k: pick[k] for k in ("title", "org", "location") if k in pick}}
+    meta = {**entry.meta, **{k: getattr(pick, k) for k in ("title", "org", "location")
+                             if getattr(pick, k) is not None}}
     lines = ["\\cventry{" + tex(per_lang(meta["title"], lang)) + "}",
              "  {" + tex(per_lang(meta["org"], lang)) + "}{" + date_range(meta, lang) + "}{"
              + tex(per_lang(meta.get("location", ""), lang)) + "}"]
-    bullet_picks = _as_list(pick.get("bullets"), f"{section}/{eid}.bullets")
-    if bullet_picks is None:
-        bullet_picks = list(entry.bullets)
+    bullet_picks = list(entry.bullets) if pick.bullets is None else pick.bullets
     items = []
     for b in bullet_picks:
-        if isinstance(b, dict):            # {id: x, en: "reworded", fr: "..."}
-            bid = b.get("id")
-            if bid not in entry.bullets:
-                raise BankError(f"{section}/{eid}: no bullet '{bid}' (have: {', '.join(entry.bullets)})")
-            text = b.get(lang) or entry.bullets[bid].text[lang]
-        else:
-            if b not in entry.bullets:
-                raise BankError(f"{section}/{eid}: no bullet '{b}' (have: {', '.join(entry.bullets)})")
-            text = entry.bullets[b].text[lang]
+        bid = b if isinstance(b, str) else b.id
+        if bid not in entry.bullets:
+            raise BankError(f"{section}/{eid}: no bullet '{bid}' (have: {', '.join(entry.bullets)})")
+        reworded = None if isinstance(b, str) else getattr(b, lang)   # {id: x, en: "reworded", fr: "..."}
+        text = reworded or entry.bullets[bid].text[lang]
         items.append("  \\item " + tex(text))
     if items:
         lines += [r"\begin{itemize}", *items, r"\end{itemize}"]
     return lines
 
 
-def render_skills(groups: dict[str, SkillGroup], picks, lang: str) -> list[str]:
+def render_skills(groups: dict[str, SkillGroup], picks: list[SkillPick], lang: str) -> list[str]:
     lines = [r"\begin{cvskills}"]
     for pick in picks:
-        if isinstance(pick, str):
-            pick = {"id": pick}
-        gid = pick.get("id")
+        gid = pick.id
         if gid not in groups:
             raise BankError(f"skills: no group '{gid}' (have: {', '.join(groups)})")
         group = groups[gid]
-        wanted = _as_list(pick.get("items"), f"skills/{gid}.items")
+        wanted = pick.items
         if wanted is None:
             chosen = group.items
         else:
@@ -176,7 +158,7 @@ def render_skills(groups: dict[str, SkillGroup], picks, lang: str) -> list[str]:
                     raise BankError(f"skills/{gid}: no item '{w}' in skills.md "
                                     f"(have: {', '.join(i['en'] for i in group.items)})")
                 chosen.append(by_name[str(w).lower()])
-        label = per_lang(pick["label"], lang) if "label" in pick else group.label[lang]
+        label = per_lang(pick.label, lang) if pick.label is not None else group.label[lang]
         lines.append(f"  \\cvskill{{{tex(label)}}}{{{', '.join(tex(i[lang]) for i in chosen)}}}")
     lines.append(r"\end{cvskills}")
     return lines

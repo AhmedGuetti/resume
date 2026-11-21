@@ -2,6 +2,7 @@ import pytest
 
 from brain.bank import BankError
 from brain.latex import date_range, render, tex
+from brain.models import Selection
 
 
 @pytest.mark.parametrize("text, expected", [
@@ -56,10 +57,19 @@ def test_default_selection_renders(bank, default_sel, lang):
 
 def test_render_rejects_unknown_ids(bank):
     with pytest.raises(BankError, match="no bank entry"):
-        render(bank, {"sections": ["experience"], "experience": ["nope"]}, "en")
+        render(bank, Selection.from_dict({"sections": ["experience"], "experience": ["nope"]}), "en")
     eid = next(iter(bank["experience"]))
     with pytest.raises(BankError, match="no bullet"):
-        render(bank, {"sections": ["experience"],
-                      "experience": [{"id": eid, "bullets": ["nope"]}]}, "en")
-    with pytest.raises(BankError, match="unknown section"):
-        render(bank, {"sections": ["hobbies"]}, "en")
+        render(bank, Selection.from_dict({"sections": ["experience"],
+                                          "experience": [{"id": eid, "bullets": ["nope"]}]}), "en")
+
+
+def test_reworded_bullet_and_overrides(bank):
+    eid, entry = next(iter(bank["experience"].items()))
+    bid = next(iter(entry.bullets))
+    sel = Selection.from_dict({"sections": ["experience"], "experience": [
+        {"id": eid, "title": {"en": "Custom Title", "fr": "Titre perso"},
+         "bullets": [{"id": bid, "en": "Reworded & shorter"}]}]})
+    assert "Custom Title" in render(bank, sel, "en") and "Titre perso" in render(bank, sel, "fr")
+    assert r"Reworded \& shorter" in render(bank, sel, "en")
+    assert entry.bullets[bid].text["fr"].split()[0] in render(bank, sel, "fr")   # no fr: bank text

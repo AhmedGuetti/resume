@@ -72,6 +72,7 @@ def test_find_same_job_by_link_and_by_text(tmp_path):
     _application(tmp_path, "globex", url=None, meta={"offer_hash": offer_hash("Some offer")})
 
     hits = find_same_job(tmp_path, "linkedin:4012345678", "zzzz")
+    assert hits[0][1].url.endswith("4012345678")
     assert [(f.name, why) for f, _, why in hits] == [("acme", "same link")]
 
     hits = find_same_job(tmp_path, None, offer_hash("SOME   offer"))

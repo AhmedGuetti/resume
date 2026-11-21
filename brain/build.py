@@ -9,13 +9,14 @@ from pathlib import Path
 
 from .bank import ROOT
 from .latex import render
+from .models import Selection
 
 
 class LatexError(Exception):
     pass
 
 
-def write_tex(bank: dict, sel: dict, lang: str, tex_dir: Path) -> Path:
+def write_tex(bank: dict, sel: Selection, lang: str, tex_dir: Path) -> Path:
     tex_dir.mkdir(parents=True, exist_ok=True)
     tex_path = tex_dir / f"resume-{lang}.tex"
     tex_path.write_text(render(bank, sel, lang), encoding="utf-8")

@@ -17,8 +17,10 @@ from __future__ import annotations
 
 import re
 from functools import lru_cache
+from typing import Union
 
 from .bank import Bullet, Entry, usable, variant_base
+from .models import BulletKey, EntryPick, MatchReport, Selection, SkillPick
 
 # Words an offer may use for a bank keyword. Keys are bank keywords (lowercase).
 SYNONYMS = {
@@ -100,28 +102,23 @@ def pick_bullets(entry: Entry, found: set[str]) -> list[tuple[str, int]]:
     return keep or ranked[:1]
 
 
-def select(bank: dict, offer: str, default: dict) -> tuple[dict, dict]:
-    """Returns (selection, report).
-
-    report["found"]    keywords the offer mentions
-    report["bullets"]  {(section, entry id, bullet id): score} for every bullet in the bank
-    report["projects"] {project id: score}
-    """
+def select(bank: dict, offer: str, default: Selection) -> tuple[Selection, MatchReport]:
+    """Returns (selection, report): report.found is the keywords the offer mentions,
+    report.bullets / report.projects score everything in the bank."""
     found = found_keywords(bank, offer)
-    sel = {"sections": default.get("sections", ["education", "experience", "projects", "skills"])}
     scores = {}
-
     for section in ("education", "experience", "projects"):
         for eid, entry in bank[section].items():
-            scores.update({(section, eid, bid): score_bullet(b, found) for bid, b in entry.bullets.items()})
+            scores.update({BulletKey(section, eid, bid): score_bullet(b, found)
+                           for bid, b in entry.bullets.items()})
 
+    sel = Selection(sections=default.sections, languages=default.languages)
     for section in ("education", "experience"):
-        order = [p["id"] if isinstance(p, dict) else p for p in default.get(section, [])]
+        order = [p.id for p in default.entries(section)]
         order += [eid for eid in bank[section] if eid not in order]
-        sel[section] = []
         for eid in order:
             picked = pick_bullets(bank[section][eid], found)
-            sel[section].append({"id": eid, "bullets": [bid for bid, _ in picked]})
+            sel.entries(section).append(EntryPick(id=eid, bullets=[bid for bid, _ in picked]))
 
     project_scores = []
     for pid, entry in bank["projects"].items():
@@ -131,82 +128,84 @@ def select(bank: dict, offer: str, default: dict) -> tuple[dict, dict]:
     project_scores.sort(key=lambda p: -p[1])
     chosen = [p for p in project_scores if p[1] > 0][:MAX_PROJECTS]
     if not chosen:                                         # nothing relevant: fall back to default
-        wanted = [p["id"] if isinstance(p, dict) else p for p in default.get("projects", [])]
+        wanted = {p.id for p in default.projects}
         chosen = [p for p in project_scores if p[0] in wanted]
-    sel["projects"] = []
-    for pid, _, picked in chosen:
-        sel["projects"].append({"id": pid, "bullets": [bid for bid, _ in picked]})
+    sel.projects = [EntryPick(id=pid, bullets=[bid for bid, _ in picked]) for pid, _, picked in chosen]
 
-    sel["skills"] = []
-    for pick in default.get("skills", []):
-        gid = pick["id"] if isinstance(pick, dict) else pick
-        group = bank["skills"][gid]
-        default_items = pick.get("items") if isinstance(pick, dict) else None
+    for pick in default.skills:
+        group = bank["skills"][pick.id]
         matched = [i["en"] for i in group.items if any(k in found for k in skill_keywords(i["en"]))]
-        rest = default_items or [i["en"] for i in group.items]
+        rest = pick.items or [i["en"] for i in group.items]
         items = list(dict.fromkeys(matched + rest))        # matched first, no duplicates
         size = max(len(rest), min(len(matched), MAX_SKILLS_PER_GROUP))   # same length as default
-        sel["skills"].append({"id": gid, "items": items[:size]})
+        sel.skills.append(SkillPick(id=pick.id, items=items[:size]))
 
-    return sel, {"found": sorted(found), "bullets": scores,
-                 "projects": {pid: score for pid, score, _ in project_scores}}
+    return sel, MatchReport(found=sorted(found), bullets=scores,
+                            projects={pid: score for pid, score, _ in project_scores})
 
 
-def shrink(sel: dict, scores: dict) -> str | None:
+def shrink(sel: Selection, scores: dict[BulletKey, int]) -> str | None:
     """Drop the weakest bullet (never an entry's last one). Returns what was dropped."""
     candidates = []
     for section in ("experience", "projects", "education"):
-        for entry in sel.get(section, []):
-            if len(entry["bullets"]) > 1:
-                for i, bid in enumerate(entry["bullets"]):
-                    candidates.append((scores.get((section, entry["id"], bid), 0), -i, section, entry, bid))
+        for entry in sel.entries(section):
+            if len(entry.bullets or []) > 1:
+                for i, bid in enumerate(entry.bullet_ids()):
+                    candidates.append((scores.get(BulletKey(section, entry.id, bid), 0), -i, section, entry, i))
     if candidates:
-        _, _, section, entry, bid = min(candidates, key=lambda c: (c[0], c[1]))
-        entry["bullets"].remove(bid)
-        return f"{section}/{entry['id']}/{bid}"
-    if len(sel.get("projects", [])) > 1:
-        return f"projects/{sel['projects'].pop()['id']}"
+        _, _, section, entry, i = min(candidates, key=lambda c: (c[0], c[1]))
+        bid = entry.bullet_ids()[i]
+        del entry.bullets[i]
+        return f"{section}/{entry.id}/{bid}"
+    if len(sel.projects) > 1:
+        return f"projects/{sel.projects.pop().id}"
     return None
 
 
 # ---------- filling leftover space ----------
 
-def fill_candidates(bank: dict, sel: dict, report: dict) -> list[tuple]:
+# Something that could still go on the page: a bullet of an entry already on it,
+# or a project id.
+Candidate = Union[BulletKey, str]
+
+
+def fill_candidates(bank: dict, sel: Selection, report: MatchReport) -> list[Candidate]:
     """Everything that could still go on the page, most relevant first:
     unused bullets of entries already on the page, then projects not on it."""
     section_rank = {"experience": 0, "projects": 1, "education": 2}
     candidates = []
     for section, rank in section_rank.items():
-        for entry in sel.get(section, []):
-            on_page = {variant_base(b) for b in entry["bullets"]}
-            for bid, bullet in bank[section][entry["id"]].bullets.items():
+        for entry in sel.entries(section):
+            on_page = {variant_base(b) for b in entry.bullet_ids()}
+            for bid, bullet in bank[section][entry.id].bullets.items():
                 if usable(bullet) and variant_base(bid) not in on_page:
-                    score = report["bullets"][(section, entry["id"], bid)]
-                    candidates.append((score, rank, ("bullet", section, entry["id"], bid)))
-    on_page = {p["id"] for p in sel.get("projects", [])}
-    for pid, score in report["projects"].items():
+                    key = BulletKey(section, entry.id, bid)
+                    candidates.append((report.bullets[key], rank, key))
+    on_page = {p.id for p in sel.projects}
+    for pid, score in report.projects.items():
         if pid not in on_page:
-            candidates.append((score, 3, ("project", pid)))
+            candidates.append((score, 3, pid))
     candidates.sort(key=lambda c: (-c[0], c[1]))        # stable: ties keep file order
     return [c[2] for c in candidates]
 
 
-def add(sel: dict, bank: dict, report: dict, candidate: tuple) -> str:
+def add(sel: Selection, bank: dict, report: MatchReport, candidate: Candidate) -> str:
     """Put a candidate on the page. Returns a label for messages."""
-    if candidate[0] == "bullet":
-        _, section, eid, bid = candidate
-        next(e for e in sel[section] if e["id"] == eid)["bullets"].append(bid)
+    if isinstance(candidate, BulletKey):
+        section, eid, bid = candidate
+        entry = sel.entry(section, eid)
+        entry.bullets = [*(entry.bullets or []), bid]
         return f"{section}/{eid}/{bid}"
-    pid = candidate[1]
-    best = max(bank["projects"][pid].bullets, key=lambda b: report["bullets"][("projects", pid, b)])
-    sel.setdefault("projects", []).append({"id": pid, "bullets": [best]})
+    pid = candidate
+    best = max(bank["projects"][pid].bullets, key=lambda b: report.bullets[BulletKey("projects", pid, b)])
+    sel.projects.append(EntryPick(id=pid, bullets=[best]))
     return f"projects/{pid}"
 
 
-def undo(sel: dict, candidate: tuple) -> None:
+def undo(sel: Selection, candidate: Candidate) -> None:
     """Take back the last `add` of this candidate."""
-    if candidate[0] == "bullet":
-        _, section, eid, bid = candidate
-        next(e for e in sel[section] if e["id"] == eid)["bullets"].remove(bid)
+    if isinstance(candidate, BulletKey):
+        section, eid, bid = candidate
+        sel.entry(section, eid).bullets.remove(bid)
     else:
-        sel["projects"] = [p for p in sel["projects"] if p["id"] != candidate[1]]
+        sel.projects = [p for p in sel.projects if p.id != candidate]

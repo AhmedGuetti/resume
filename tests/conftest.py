@@ -26,9 +26,9 @@ def bank():
 
 @pytest.fixture(scope="session")
 def default_sel():
-    import yaml
     from brain.bank import BANK
-    return yaml.safe_load((BANK / "selections" / "default.yaml").read_text(encoding="utf-8"))
+    from brain.models import Selection
+    return Selection.load(BANK / "selections" / "default.yaml")
 
 
 class FakeLLM:
