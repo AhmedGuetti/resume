@@ -1,0 +1,54 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  tests:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: requirements*.txt
+      - run: pip install -r requirements-dev.txt
+      - run: python -m pytest
+
+  resume:
+    # Builds the general resume from the bank and fails if it no longer fits one page,
+    # or if the committed cv/resume-*.tex are out of date with bank/.
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: requirements*.txt
+      - run: pip install -r requirements.txt
+      - name: Install TeX Live, fonts and tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            texlive-luatex texlive-latex-extra texlive-lang-french latexmk chktex \
+            poppler-utils fonts-adobe-sourcesans3
+          fc-cache -f
+      - name: Build both languages
+        run: make -B all
+      - name: Generated .tex match the bank
+        run: git diff --exit-code -- cv/resume-en.tex cv/resume-fr.tex
+      - name: One page each
+        run: |
+          make check
+          for l in en fr; do
+            p=$(pdfinfo pdf/resume-$l.pdf | awk '/^Pages/{print $2}')
+            echo "resume-$l: $p page(s)"
+            test "$p" -eq 1
+          done
+      - uses: actions/upload-artifact@v4
+        with:
+          name: resume-pdf
+          path: pdf/*.pdf
