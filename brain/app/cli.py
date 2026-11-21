@@ -7,6 +7,7 @@
     python -m brain apply "Company X" --model deepseek:deepseek-chat   # pick the model
     python -m brain apply "Company X" --no-ai             # keyword matching only
     python -m brain build SELECTION [--out DIR]           # PDFs from a selection file
+    python -m brain score company-x                       # fit score, competition, position
     python -m brain catalog [--json]                      # what's in the bank
     python -m brain usage                                 # what the LLM calls cost
 
@@ -26,6 +27,7 @@ from ..errors import LatexError
 from ..paths import show
 from ..render.pdf import build_all, pdf_path
 from .apply import cmd_apply
+from .score import cmd_score
 
 
 def cmd_build(args) -> int:
@@ -105,6 +107,13 @@ def main(argv=None) -> int:
     a.add_argument("--no-ai", action="store_true", help="keyword matching only, even if a model is configured")
     a.add_argument("--no-fill", action="store_true",
                    help="only keep matching content, don't add more to fill the page")
+    a.add_argument("--no-score", action="store_true", help="skip the fit score and competition questions")
+
+    s = sub.add_parser("score", help="fit score, competition and position for an application")
+    s.add_argument("company", help="the application's folder name in cv/company/ (see `list`)")
+    s.add_argument("--model", help="LLM that judges the requirements (default: `models.score` in config.yaml)")
+    s.add_argument("--no-ai", action="store_true", help="judge the requirements by keyword matching")
+    s.add_argument("--no-ask", action="store_true", help="don't ask for the competition numbers")
 
     b = sub.add_parser("build", help="generate .tex (and PDF) from a selection file")
     b.add_argument("selection")
@@ -120,7 +129,8 @@ def main(argv=None) -> int:
     c.add_argument("--json", action="store_true", help="full machine-readable dump")
 
     args = ap.parse_args(argv)
-    commands = {"apply": cmd_apply, "build": cmd_build, "catalog": cmd_catalog, "usage": cmd_usage}
+    commands = {"apply": cmd_apply, "build": cmd_build, "catalog": cmd_catalog, "usage": cmd_usage,
+                "score": cmd_score}
     try:
         return commands[args.cmd](args)
     except (BankError, KeyError) as e:
@@ -130,7 +140,7 @@ def main(argv=None) -> int:
         print(f"ERROR: {e}", file=sys.stderr)
         return 2
     except Exception as e:                       # LLM / network / API key problems
-        if args.cmd != "apply":
+        if args.cmd not in ("apply", "score"):
             raise
         print(f"ERROR: {type(e).__name__}: {e}", file=sys.stderr)
         print("Tip: --no-ai builds the resume with keyword matching instead.", file=sys.stderr)

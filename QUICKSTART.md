@@ -135,6 +135,9 @@ What happens next:
 2. **The offer's facts** are read: company, title, salary, date, skills... Anything the offer
    doesn't say, you're asked. Press Enter to leave it empty.
 3. **Content is picked** for this offer, and the page is filled to exactly one page.
+4. **You get a score**: how well you fit the offer (0-100), what's missing, and where you
+   stand. You're asked how many people applied and their seniority: paste LinkedIn's
+   "applicants" breakdown as is, or type `entry 45, senior 30`. Press Enter to skip.
 
 You get a new folder:
 
@@ -175,8 +178,9 @@ ninurta> build acme
 | Command | What it does |
 |---|---|
 | `apply` | paste an offer, get a tailored resume |
-| `list` | all your applications, newest first |
-| `show acme` | the facts saved from that offer |
+| `list` | all your applications, newest first, with fit score and verdict |
+| `show acme` | the facts saved from that offer, and the score |
+| `score acme` | update the applicant numbers and re-score |
 | `open acme [fr]` | open the PDF |
 | `build acme` | rebuild after editing `selection.yaml` |
 | `catalog` | every entry, bullet id and skill in your bank |

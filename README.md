@@ -145,6 +145,7 @@ bank's tags and skill names in the offer, with a few English/French synonyms.
 models:
   extract: deepseek:deepseek-chat     # read the offer's facts
   select: deepseek:deepseek-chat      # pick the resume content
+  score: deepseek:deepseek-chat       # judge the fit (default: the select model)
   fallback: gemini:gemini-3.6-flash   # only when DeepSeek fails or answers badly
 budget:
   daily: 0.50                         # $; when reached, apply goes on without AI
@@ -177,6 +178,31 @@ make apply COMPANY="Company X" OFFER=offer.txt NOAI=1                        # k
 or, if there's room left, adds the next most relevant bullets and projects one at a time,
 keeping each one that still fits on one page in both languages (`--no-fill` skips this).
 
+**Where you stand.** At the end, `apply` scores how well you fit the offer and saves it in
+`job.json`:
+
+- **Fit (0-100)**: each required and nice-to-have skill of the offer is judged met / partial /
+  missing (50 and 15 points), plus your years of experience against the years asked (15),
+  your level against the level asked (10) and your degree against the one asked (10). A part
+  the offer doesn't mention is left out, not counted against you. With AI, the model judges
+  each requirement but must cite bullets or skills of your bank as evidence; anything without
+  valid evidence counts as missing. Without AI, keyword matching does it.
+- **Two numbers**: the fit of what's on this resume, and of everything in your bank. The gap is
+  what the tailoring left out (it's listed).
+- **You** are computed from the bank: years of experience from the dates in
+  `bank/experiences/` (overlaps counted once), degree from `bank/education/`. Your level is
+  guessed from the years, or set it with `seniority: entry` in `bank/profile.md`.
+- **Competition**: you're asked how many people applied and LinkedIn's seniority breakdown
+  (paste LinkedIn's text as is, or type `entry 45, senior 30`). Each answer is a dated
+  snapshot, so you can follow a job filling up.
+- **Position**: strong / possible / long shot, from the fit and how many applicants are more
+  senior than you, with the reasons written out. Use it to compare your applications, not as
+  a prediction.
+
+The numbers change: run `python -m brain score company-x` (or `score company-x` in the shell) to update the
+competition and re-score. `list` shows every application's fit and verdict, `show` the details.
+`apply --no-score` skips this step.
+
 The result is a starting point. Edit `selection.yaml` if you disagree, then rebuild:
 
 ```bash
@@ -191,6 +217,7 @@ brain/
   bank/      the content (bank/*.md) and Selection: what goes on one resume
   offer/     a job offer: facts checked against its text, job.json, already applied?
   pick/      choose content for an offer (keywords or LLM), fit it on one page
+  score/     fit score against the offer, competition, position
   render/    selection -> LaTeX -> PDF
   llm/       one client per provider, fallback chain, spending log and budget
   app/       the CLI, the `apply` pipeline step by step, the ninurta> shell

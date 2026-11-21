@@ -10,6 +10,7 @@ The steps, in order (each one is a function below):
     6. pick_content         the LLM (or keyword matching) chooses what goes on the page (pick/)
     7. fit_one_page         drop the weakest bullets, or add the next best, until it fills one page
     8. write_selection      selection.yaml: what was picked and why, to edit and rebuild by hand
+    9. score_application    fit score, competition (asked to you) and position -> job.json (app/score.py)
 
 A step that has to stop the run raises Stop with the exit code.
 """
@@ -37,6 +38,7 @@ from ..pick.fit import add, fill_candidates, shrink, undo
 from ..pick.keywords import select as keyword_select
 from ..pick.report import MatchReport
 from ..render.pdf import build_all, pdf_path
+from .score import print_score, score_application
 from .terminal import ask_link, ask_missing, confirm, print_job, read_pasted_offer
 
 MAX_FILL_MISSES = 3         # stop filling after this many tries in a row don't fit
@@ -109,15 +111,21 @@ def cmd_apply(args) -> int:
         sel, report = pick_content(run, bank, offer.text, folder)
         pages, dropped, added = fit_one_page(bank, sel, report, folder, args.no_fill)
         write_selection(folder, sel, report, record, run.used(), dropped, added)
+        if not args.no_score:
+            score_application(bank, record, sel, run.chain("score"), run.llms, label=folder.name)
+            record.save(folder / "job.json")
+            print_score(record)
     except Stop as stop:
         if str(stop):
             print(str(stop), file=sys.stderr if stop.code == EXIT_BAD_INPUT else sys.stdout)
         return stop.code
 
+    for llm in run.used():
+        print(f"   {llm.usage_line()}")
     for lang in LANGS:
         print(f"-> {show(pdf_path(folder, lang))} ({pages[lang]} page{'s' if pages[lang] > 1 else ''})")
     print(f"-> {show(folder / 'selection.yaml')} (what was picked, and why)")
-    print(f"-> {show(folder / 'job.json')} (facts from the offer)")
+    print(f"-> {show(folder / 'job.json')} (facts from the offer, fit score, competition)")
     return EXIT_TOO_LONG if max(pages.values()) > 1 else 0
 
 
@@ -238,8 +246,6 @@ def pick_content(run: Run, bank: dict, offer: str, folder: Path) -> tuple[Select
     else:
         sel, report = keyword_select(bank, offer, default)
         print(f"Matched keywords ({len(report.found)}): {', '.join(report.found) or 'none'}")
-    for llm in run.used():
-        print(f"   {llm.usage_line()}")
     return sel, report
 
 

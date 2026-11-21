@@ -22,6 +22,7 @@ from ..config import task_models
 from ..paths import show
 from ..render.pdf import pdf_path
 from . import cli
+from .score import print_score
 from .terminal import print_job
 
 HISTORY_FILE = paths.BUILD / ".shell_history"
@@ -80,6 +81,21 @@ class Shell(cmd.Cmd):
 
     complete_apply = complete_company
 
+    def do_score(self, line: str) -> None:
+        """score COMPANY [--no-ai] [--no-ask] [--model ID]
+        How well you fit that offer, and where you stand among the applicants.
+        Asks for the applicant count and LinkedIn's seniority breakdown (Enter keeps the
+        last values); each run keeps a dated snapshot in job.json. Re-run it when the
+        numbers change."""
+        if "--model" not in line and "--no-ai" not in line:
+            if self.override == "off":
+                line += " --no-ai"
+            elif self.override:
+                line += f" --model {shlex.quote(self.override)}"
+        self.run("score", line)
+
+    complete_score = complete_company
+
     def do_build(self, line: str) -> None:
         """build SELECTION [--lang en|fr] [--out DIR] [--no-pdf]
         Rebuild PDFs from a selection file (after editing it by hand).
@@ -116,6 +132,7 @@ class Shell(cmd.Cmd):
             if getattr(record, field):
                 print(f"   {field}: " + "; ".join(getattr(record, field)))
         print(f"   status      {record.application.status}")
+        print_score(record)
 
     complete_show = complete_company
 
@@ -131,11 +148,20 @@ class Shell(cmd.Cmd):
         if not folders:
             print("No applications yet. Start with: apply \"Company name\"")
             return
+        from ..offer.record import JobRecord
         folders.sort(key=lambda p: p.stat().st_mtime, reverse=True)
         for folder in folders:
             pdfs = " ".join(lang for lang in LANGS if pdf_path(folder, lang).exists())
             when = datetime.fromtimestamp(folder.stat().st_mtime)
-            print(f"  {when:%Y-%m-%d %H:%M}  {folder.name:<30} {pdfs or '(no PDF yet)'}")
+            try:
+                record = JobRecord.load(folder / "job.json")
+            except ValueError:
+                record = None
+            fit = record.fit if record else None
+            total = (fit.resume if fit.resume is not None else fit.bank) if fit else None
+            score = f"fit {total:>3}" if total is not None else "fit   -"
+            verdict = record.position.verdict if record and record.position else ""
+            print(f"  {when:%Y-%m-%d %H:%M}  {folder.name:<30} {pdfs or '(no PDF)':<6} {score}  {verdict}")
 
     def do_open(self, line: str) -> None:
         """open COMPANY [en|fr]

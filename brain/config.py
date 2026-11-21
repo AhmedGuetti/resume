@@ -5,6 +5,7 @@ config.yaml at the repo root (copy config.example.yaml):
     models:                              # which model does which job
       extract: deepseek:deepseek-chat    # read the offer's facts
       select:  deepseek:deepseek-chat    # pick the resume content
+      score:   deepseek:deepseek-chat    # judge the fit (default: the select model)
       fallback: gemini:gemini-3.6-flash  # only if the first one fails
     budget:                              # $; when reached, apply uses no AI
       daily: 0.50
@@ -30,7 +31,7 @@ ENV_KEYS = {
     "gemini": ["GEMINI_API_KEY", "GOOGLE_API_KEY"],
     "deepseek": ["DEEPSEEK_API_KEY"],
 }
-TASKS = ("extract", "select")
+TASKS = ("extract", "select", "score")
 
 
 @lru_cache(maxsize=1)
@@ -41,12 +42,15 @@ def load_config() -> dict:
 
 
 def task_models() -> dict[str, str | None]:
-    """{"extract": id, "select": id, "fallback": id}; None = not set."""
+    """{"extract": id, "select": id, "score": id, "fallback": id}; None = not set.
+    `score` defaults to the `select` model."""
     cfg = load_config()
     models = cfg.get("models") or {}
     single = cfg.get("model")
+    select = models.get("select") or single
     return {"extract": models.get("extract") or single,
-            "select": models.get("select") or single,
+            "select": select,
+            "score": models.get("score") or select,
             "fallback": models.get("fallback")}
 
 
