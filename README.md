@@ -11,6 +11,8 @@ If you're just here to read the resume, grab the PDF:
 - [English](pdf/resume-en.pdf)
 - [Français](pdf/resume-fr.pdf)
 
+New here and want to use it for your own resume? Start with the [Quickstart](QUICKSTART.md).
+
 The rest of this README is mostly a note to future me on how it all works.
 
 ## Layout
