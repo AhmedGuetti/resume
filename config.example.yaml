@@ -1,0 +1,21 @@
+# Copy to config.yaml (git-ignored) and fill in your keys.
+# Environment variables GEMINI_API_KEY / DEEPSEEK_API_KEY override the keys below.
+
+# Which model does which job (provider:model).
+models:
+  extract: deepseek:deepseek-chat     # read the offer's facts
+  select: deepseek:deepseek-chat      # pick the resume content
+  fallback: gemini:gemini-3.6-flash   # only when DeepSeek fails or answers badly
+
+# Spending limits in $ (estimates from brain/llm/pricing.yaml). When one is
+# reached, apply goes on without AI. See what you spent with `usage`.
+budget:
+  daily: 0.50
+  monthly: 5.00
+
+# Gemini "thinks" before answering and bills it as output. Off by default.
+gemini_thinking: false
+
+keys:
+  gemini: ""      # Google AI Studio: https://aistudio.google.com/apikey
+  deepseek: ""    # https://platform.deepseek.com/api_keys

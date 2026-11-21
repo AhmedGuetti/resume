@@ -1,0 +1,46 @@
+# The general-purpose resume (what pdf/resume-*.pdf shows).
+# Copy this file to tailored/<job>/selection.yaml and edit it to tailor a resume.
+#
+# Every entry refers to a bank file by its name without .md, and to bullets by
+# their `## id`. Leave out `bullets` (or `items` for skills) to take all of them
+# in file order. Order in this file = order on the page.
+
+sections: [education, experience, projects, skills]
+
+education:
+  - id: ut3-master-iafa
+    bullets: [tir-paper, coursework, course-projects]
+
+experience:
+  - id: magellan
+    bullets:
+      - overview
+      - bugpredict-refactor-short
+      - bugpredict-benchmark
+      - bugpredict-cicd-short
+      - argus-pitch-short
+      - argus-spec-vs-code
+      - handover
+  - id: isis-champollion
+    bullets: [easytalk-pitch, easytalk-api, easyrmm-pitch]
+  - id: cnrs-lisa
+    bullets: [lisa-pitch, lisa-tooling-short, lisa-results-short]
+
+projects:
+  - id: gmath
+  - id: ninurta
+
+skills:
+  - id: languages
+    items: [Python, C++, Rust, TypeScript/JavaScript, SQL]
+  - id: ai-ml
+    items:
+      - LangGraph
+      - LangChain
+      - Pydantic
+      - agentic systems and evaluation
+      - NLP (CamemBERT, GLiNER, LLM APIs)
+      - computer vision
+  - id: tools
+    items: [OpenGL, FastAPI, React, PySide6, GCP, GitLab CI/CD, Git, WSL2/Linux, Neovim]
+  - id: spoken

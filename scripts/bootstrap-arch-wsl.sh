@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Bootstrap a LaTeX toolchain for the resume repo on Arch Linux (WSL2).
+# Bootstrap a LaTeX toolchain for Ninurta on Arch Linux (WSL2).
 # Safe to re-run. Usage:
 #   ./scripts/bootstrap-arch-wsl.sh          # standard install (~600 MB)
 #   ./scripts/bootstrap-arch-wsl.sh --full   # + texlive-fontsextra (~1.5 GB more fonts)
@@ -18,12 +18,14 @@ PKGS=(
   texlive-latexextra texlive-fontsrecommended texlive-luatex texlive-xetex
   texlive-binextra           # latexmk, chktex, latexindent, synctex
   texlive-langfrench texlive-langenglish
+  adobe-source-sans-fonts    # main resume font (Source Sans 3)
   # latexindent's Perl deps
   perl-yaml-tiny perl-file-homedir
   # Editor tooling
   texlab                     # LaTeX language server (Neovim, VS Code, etc.)
   poppler                    # pdftotext / pdfinfo (used by make text / check)
   make git
+  python-yaml                # PyYAML, for the brain package
 )
 (( FULL )) && PKGS+=(texlive-fontsextra)
 
