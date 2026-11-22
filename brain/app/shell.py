@@ -96,6 +96,35 @@ class Shell(cmd.Cmd):
 
     complete_score = complete_company
 
+    def do_letter(self, line: str) -> None:
+        """letter COMPANY [--style direct|warm|formal|story] [--lang en|fr] [--write] [--skeleton] [--check] [--build] [--no-adapt] [--no-ai]
+        The cover letter for an application. It suggests a style for the company (you
+        choose), picks your paragraphs from bank/letters/ that fit the offer (you can swap
+        them), adds the company's name, and drafts the "why them" paragraph for you to rewrite.
+        --write: write it paragraph by paragraph instead, with questions, starters and checks.
+        --skeleton writes letter.md with that guidance as comments, to fill in your editor.
+        After editing cv/company/<name>/letter.md by hand: letter COMPANY --build"""
+        if "--model" not in line and "--no-ai" not in line:
+            if self.override == "off":
+                line += " --no-ai"
+            elif self.override:
+                line += f" --model {shlex.quote(self.override)}"
+        self.run("letter", line)
+
+    complete_letter = complete_company
+
+    def do_translate(self, line: str) -> None:
+        """translate [--dry-run] [--stamp]
+        Translate to French the bank/letters/ paragraphs whose English changed since their
+        last translation. --stamp marks the French as up to date after you fixed it by hand."""
+        self.run("translate", line)
+
+    def do_voice(self, line: str) -> None:
+        """voice
+        Answer a few questions in your own words (bank/voice.md). The letter coach uses
+        them so its suggestions sound like you, and your banned phrases are checked."""
+        self.run("voice", line)
+
     def do_build(self, line: str) -> None:
         """build SELECTION [--lang en|fr] [--out DIR] [--no-pdf]
         Rebuild PDFs from a selection file (after editing it by hand).
@@ -164,14 +193,19 @@ class Shell(cmd.Cmd):
             print(f"  {when:%Y-%m-%d %H:%M}  {folder.name:<30} {pdfs or '(no PDF)':<6} {score}  {verdict}")
 
     def do_open(self, line: str) -> None:
-        """open COMPANY [en|fr]
-        Open a tailored resume PDF (English by default)."""
+        """open COMPANY [en|fr] [letter]
+        Open a tailored resume PDF (English by default), or with `letter` the cover letter."""
         args = shlex.split(line)
         if not args:
-            print("usage: open COMPANY [en|fr]")
+            print("usage: open COMPANY [en|fr] [letter]")
             return
-        lang = args[1] if len(args) > 1 else "en"
-        pdf = pdf_path(paths.COMPANIES / args[0], lang)
+        folder = paths.COMPANIES / args[0]
+        langs = [a for a in args[1:] if a in LANGS]
+        if "letter" in args[1:]:
+            found = [folder / "pdf" / f"letter-{lang}.pdf" for lang in (langs or LANGS)]
+            pdf = next((f for f in found if f.exists()), found[0])
+        else:
+            pdf = pdf_path(folder, langs[0] if langs else "en")
         if not pdf.exists():
             print(f"no such file: {show(pdf)}")
             return
@@ -208,7 +242,7 @@ class Shell(cmd.Cmd):
         if self.override == "off":
             print("models: off (keyword matching)")
         else:
-            for task in ("extract", "select"):
+            for task in ("extract", "select", "score", "letter"):
                 print(f"   {task:<9} {self.override or models[task] or 'none (keyword matching)'}")
             print(f"   {'fallback':<9} {models['fallback'] or 'none'}")
 

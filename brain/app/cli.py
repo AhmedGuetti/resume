@@ -8,6 +8,11 @@
     python -m brain apply "Company X" --no-ai             # keyword matching only
     python -m brain build SELECTION [--out DIR]           # PDFs from a selection file
     python -m brain score company-x                       # fit score, competition, position
+    python -m brain letter company-x                      # cover letter from bank/letters/, fitted to the offer
+    python -m brain letter company-x --write              # ... or write it paragraph by paragraph, with a coach
+    python -m brain translate                             # French of the letter paragraphs whose English changed
+    python -m brain letter company-x --build              # rebuild it after editing letter.md
+    python -m brain voice                                 # how you write, for the letter coach
     python -m brain catalog [--json]                      # what's in the bank
     python -m brain usage                                 # what the LLM calls cost
 
@@ -27,6 +32,7 @@ from ..errors import LatexError
 from ..paths import show
 from ..render.pdf import build_all, pdf_path
 from .apply import cmd_apply
+from .letter import cmd_letter, cmd_translate, cmd_voice
 from .score import cmd_score
 
 
@@ -115,6 +121,31 @@ def main(argv=None) -> int:
     s.add_argument("--no-ai", action="store_true", help="judge the requirements by keyword matching")
     s.add_argument("--no-ask", action="store_true", help="don't ask for the competition numbers")
 
+    lt = sub.add_parser("letter", help="write the cover letter for an application, paragraph by paragraph")
+    lt.add_argument("company", help="the application's folder name in cv/company/ (see `list`)")
+    lt.add_argument("--style", choices=["direct", "warm", "formal", "story"],
+                    help="skip the suggestion and use this style")
+    lt.add_argument("--lang", choices=LANGS, help="language of the letter (default: the offer's)")
+    lt.add_argument("--write", action="store_true",
+                    help="write it paragraph by paragraph with the coach, instead of assembling it from bank/letters/")
+    lt.add_argument("--no-adapt", action="store_true",
+                    help="use your bank/letters/ paragraphs as written (no linking sentence added by the AI)")
+    lt.add_argument("--skeleton", action="store_true",
+                    help="write letter.md with the guidance as comments, to fill in your editor")
+    lt.add_argument("--check", action="store_true", help="check letter.md against your rules")
+    lt.add_argument("--build", action="store_true", help="rebuild the PDF from letter.md (after editing it)")
+    lt.add_argument("--force", action="store_true", help="start over even if letter.md exists")
+    lt.add_argument("--model", help="LLM for the coach (default: `models.letter` in config.yaml)")
+    lt.add_argument("--no-ai", action="store_true", help="no model: built-in starters, keyword style suggestion")
+
+    sub.add_parser("voice", help="answer a few questions so the letter coach sounds like you")
+
+    tr = sub.add_parser("translate", help="translate bank/letters/ paragraphs whose English changed")
+    tr.add_argument("--dry-run", action="store_true", help="only list what is out of date")
+    tr.add_argument("--stamp", action="store_true",
+                    help="no AI: mark the French as up to date (after fixing it by hand)")
+    tr.add_argument("--model", help="LLM for the translation (default: `models.letter`)")
+
     b = sub.add_parser("build", help="generate .tex (and PDF) from a selection file")
     b.add_argument("selection")
     b.add_argument("--lang", choices=LANGS, help="one language only (default: both)")
@@ -130,7 +161,8 @@ def main(argv=None) -> int:
 
     args = ap.parse_args(argv)
     commands = {"apply": cmd_apply, "build": cmd_build, "catalog": cmd_catalog, "usage": cmd_usage,
-                "score": cmd_score}
+                "score": cmd_score, "letter": cmd_letter, "voice": cmd_voice,
+                "translate": cmd_translate}
     try:
         return commands[args.cmd](args)
     except (BankError, KeyError) as e:

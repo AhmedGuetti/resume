@@ -11,6 +11,8 @@ bank/
   experiences/<company>.md   one file per job / internship
   projects/<project>.md      one file per project
   selections/default.yaml    the general-purpose resume (pdf/resume-*.pdf)
+  letters/                   cover letter paragraphs, one file per entry (see letters/README.md)
+  voice.md                   how I write, for the cover letter coach
 ```
 
 This folder is the only place resume content lives: `make` regenerates

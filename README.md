@@ -22,7 +22,9 @@ bank/              all the content, as Markdown (see bank/README.md)
 brain/             the Python side: reads the bank, picks content for an offer, builds PDFs
 config.example.yaml  copy to config.yaml (git-ignored) for the LLM model and API keys
 cv/
-  resume.cls       shared layout and macros (\cvheader, \cventry, \cvskill, ...)
+  ninurta.sty      font, accent color and header, shared by the resume and the letter
+  resume.cls       resume layout and macros (\cventry, \cvskill, ...)
+  coverletter.cls  cover letter layout (cv/company/<name>/letter.md -> letter-<lang>.pdf)
   resume-en.tex    English version (generated from bank/, don't edit)
   resume-fr.tex    French version  (generated from bank/, don't edit)
   company/<name>/  tailored resumes, one folder per application (not in git)
@@ -219,6 +221,7 @@ brain/
   pick/      choose content for an offer (keywords or LLM), fit it on one page
   score/     fit score against the offer, competition, position
   render/    selection -> LaTeX -> PDF
+  letter/    cover letters: styles, bank/letters/ paragraphs, assembling, checks, letter.md -> PDF
   llm/       one client per provider, fallback chain, spending log and budget
   app/       the CLI, the `apply` pipeline step by step, the ninurta> shell
   paths.py   where everything lives
@@ -227,6 +230,45 @@ brain/
 ```
 
 Each folder's `__init__.py` lists what its files do; `brain/__init__.py` has the overall map.
+
+## The cover letter
+
+Cover letters are assembled from paragraphs I write once, in
+[bank/letters/](bank/letters/README.md): one file per bank entry, with openers and stories
+about each project, plus `general.md` for motivation and closings.
+
+```
+ninurta> letter company-x      # assemble the letter for that application
+ninurta> translate             # after rewriting English paragraphs: redo their French
+```
+
+- **Style.** Four styles ([brain/letter/styles.yaml](brain/letter/styles.yaml)): *direct and
+  plain*, *warm and personal*, *formal and classic*, *engineer's story*. A model suggests one
+  for the company and must quote the offer to back it (keyword cues without AI); I choose.
+  Each style is four slots, and each slot says which kind of paragraph fills it.
+- **Picking.** For each slot, the paragraph of my bank that fits the offer best: a model
+  picks (ids it makes up, or of the wrong kind, are dropped), or tag matching plus the fit
+  score's evidence without AI. I see the picks and can swap any of them.
+- **What the AI writes.** `{company}` and `{job_title}` are filled in from the offer. The
+  story gets at most one linking sentence at its end, naming the company or the role: my
+  text is never changed. The "why them" paragraph is drafted from the offer and marked for me
+  to rewrite: every number must be in the offer, and in a letter in another language than
+  the offer, pasting the offer's words is refused.
+- **French.** Each paragraph has `en:` and `fr:`. When I change the English, its French is
+  out of date (a hash of the English is stored next to it); `translate` redoes those, keeping
+  every number and placeholder, and `translate --stamp` marks French I fixed by hand.
+- **Checks** ([brain/letter/lint.py](brain/letter/lint.py)): cliché openers, em dashes and
+  other AI tells, sentences that list skills or copy a resume bullet, length, and my own
+  banned phrases (`bank/voice.md`). They point; they never rewrite.
+- **Result.** `cv/company/<name>/letter.md`, in the offer's language (`--lang` to change it),
+  with each paragraph's source and what the AI did in a comment above it. Edit it, then
+  `letter <name> --build`. It's built with [cv/coverletter.cls](cv/coverletter.cls), which
+  shares [cv/ninurta.sty](cv/ninurta.sty) (font, accent color, header) with the resume.
+- `letter <name> --write` writes it paragraph by paragraph instead, with questions, ways to
+  start and the checks after each one; `--skeleton` puts that guidance in `letter.md` as
+  comments, for an editor; `--no-adapt` adds no sentence; `--check` only runs the checks.
+
+How to write each part well, with examples: [LETTERS.md](LETTERS.md).
 
 ## Editing
 

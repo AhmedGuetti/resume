@@ -8,12 +8,13 @@ The packages follow the path of one application:
     pick/     choose the content for an offer (keywords or LLM), fit it on one page
     score/    how well you fit the offer, and where you stand among the applicants
     render/   selection -> LaTeX -> PDF
+    letter/   the cover letter coach: four styles, your voice, checks, letter.md -> PDF
     llm/      model backends, fallback chain, spending log and budget
     app/      what you type: the CLI, the `apply` pipeline, the ninurta> shell
 
     paths.py  where everything lives      config.py  config.yaml      errors.py  error types
 
-Who imports whom: app uses everything; pick, score, offer and render use bank and llm
+Who imports whom: app uses everything; pick, score, offer, render and letter use bank and llm
 (score reuses pick's helpers, offer's job.json stores score's results); bank and llm
 use only paths, config and errors; nothing imports app.
 """

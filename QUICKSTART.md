@@ -173,6 +173,38 @@ ninurta> build acme
 
 ---
 
+## 6. The cover letter
+
+Letters are assembled from paragraphs you write once, in `bank/letters/`: one file per
+experience, project and degree, plus `general.md` for openers and closings
+([format](bank/letters/README.md)). Write each paragraph in English, then let the AI do the French:
+
+```
+ninurta> translate
+```
+
+Then, for an application:
+
+```
+ninurta> letter acme
+```
+
+1. **Pick a style.** It suggests one of four for this company (direct, warm, formal,
+   engineer's story) and says why. Press Enter to take it, or choose another.
+2. **Check the picks.** It shows which of your paragraphs it chose for each part of the
+   letter. Press Enter, or type a number to swap one.
+3. **The AI fills in** the company and the job title, may add one sentence linking your
+   story to the offer, and drafts the "why this company" paragraph. All of it is marked in
+   `letter.md`, so you know what to rewrite.
+4. You get `cv/company/acme/letter.md` and `pdf/letter-en.pdf` (or `-fr`), in the offer's
+   language, with the same font and colors as the resume. Edit `letter.md`, then
+   `letter acme --build`. `open acme letter` opens it.
+
+No paragraphs yet, or want to write this one from scratch? `letter acme --write` walks you
+through each paragraph with questions and ways to start. How to write each part well: [LETTERS.md](LETTERS.md).
+
+---
+
 ## Shell commands at a glance
 
 | Command | What it does |
@@ -182,6 +214,11 @@ ninurta> build acme
 | `show acme` | the facts saved from that offer, and the score |
 | `score acme` | update the applicant numbers and re-score |
 | `open acme [fr]` | open the PDF |
+| `letter acme` | the cover letter, assembled from your `bank/letters/` paragraphs |
+| `letter acme --write` | write it paragraph by paragraph instead, with a coach |
+| `translate` | redo the French of the paragraphs whose English you changed |
+| `letter acme --build` | rebuild the letter after editing `letter.md` |
+| `voice` | answer a few questions so the coach sounds like you |
 | `build acme` | rebuild after editing `selection.yaml` |
 | `catalog` | every entry, bullet id and skill in your bank |
 | `model off` | no AI for this session (`model config` to undo) |
