@@ -22,7 +22,7 @@ experience:
       - argus-spec-vs-code
       - handover
   - id: isis-champollion
-    bullets: [easytalk-pitch, easytalk-api, easyrmm-pitch]
+    bullets: [easytalk-pitch, easytalk-heideltime, easyrmm-results-short]
   - id: cnrs-lisa
     bullets: [lisa-pitch, lisa-tooling-short, lisa-results-short]
 

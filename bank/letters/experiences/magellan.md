@@ -10,14 +10,13 @@ tags: [agents, llm, ownership, autonomy, ai]
 by: claude
 en: >-
   In one year of work-study at Magellan, I went from joining a 5-person team on an LLM test
-  generator to building an agent engine on my own. That move from contributor to owner is
-  what I would bring to the {job_title} role at {company}.
+  generator to building an agent engine on my own. I would bring that same ownership to the
+  {job_title} role at {company}.
 fr: >-
   En un an d'alternance chez Magellan, mon rôle a évolué : d'abord dans une équipe de 5 sur
-  un générateur de tests par LLM, puis en autonomie complète sur un moteur d'agents. C'est
-  cette progression vers plus d'autonomie que j'apporterais au poste de {job_title} chez
-  {company}.
-translated_from: 80ae92ed
+  un générateur de tests par LLM, puis en autonomie complète sur un moteur d'agents.
+  J'apporterais cette même autonomie au poste de {job_title} chez {company}.
+translated_from: 89d203d0
 
 ## opener-spec-bugs
 kind: opener

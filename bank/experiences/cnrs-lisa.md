@@ -10,6 +10,11 @@ start: 2024-04
 end: 2024-04
 # One-month internship, April 2024. Display: "Apr. 2024" / "Avr. 2024".
 tags: [nlp, machine-translation, statistical-mt, low-resource, corsican, flair, pytorch, python, awk, error-analysis, data-quality, ocr, linguistics, research]
+conflicts:                # at most one bullet of each group on a resume (enforced)
+  - [lisa-overview, lisa-pitch]
+  - [lisa-tooling, lisa-tooling-short]
+  - [lisa-tooling, lisa-awk]
+  - [lisa-results, lisa-results-short]
 ---
 
 <!--
@@ -24,10 +29,15 @@ inside the statistical MT system.
 Precision figures are from memory (~0.90 -> ~0.96); the user called 0.96 "solid".
 Tooling chain: Python (parse Flair output) -> AWK scripts (statistics) -> Excel (visualisation for linguists).
 The old "~10% translation accuracy" bullet is superseded: the gain was in model precision.
-Conflicts (pick at most ONE per line):
-  - lisa-overview | lisa-pitch
-  - lisa-tooling | lisa-tooling-short
-  - lisa-results | lisa-results-short
+Team documents in doc/UMR-LISA/ (not written by Ahmed, context only): the LREC 2024 paper
+"Agettivu, aggitivu o aghjettivu? POS Tagging Corsican Dialects" (first Corsican POS tagger,
+93.38% accuracy, 500-sentence gold corpus annotated in INCEpTION), the lab's POS annotation
+guide and the annotators' tagging manual. Ahmed is not an author: never claim the paper. The user's own internship report is lost;
+these documents describe the project the work was part of (Corsican POS tagging with Flair,
+annotation in INCEpTION, iterative rounds of tagging and review).
+AWK: the scripts read Flair's results straight from the terminal output, computed the
+statistics and displayed them, before the Excel step.
+Conflicts: see `conflicts:` in the front matter (checked by the code).
 -->
 
 
@@ -70,6 +80,16 @@ fr: Précision du modèle portée d'environ 0,90 à 0,96 grâce à la correction
 tags: ocr, corpus-building, data-collection, low-resource, data-cleaning
 en: Extended the corpus by digitising a Corsican book with the other intern: scanning, OCR and manual correction, in two days.
 fr: Enrichissement du corpus par la numérisation d'un livre corse avec l'autre stagiaire : scan, OCR et correction manuelle, en deux jours.
+
+## lisa-awk
+tags: awk, scripting, cli, linux, data-processing, tooling
+en: Wrote AWK scripts that parsed the tagger's results from the terminal, computed per-category statistics and displayed them, so each training run could be checked in seconds.
+fr: Écriture de scripts AWK qui lisaient les résultats de l'étiqueteur dans le terminal, calculaient des statistiques par catégorie et les affichaient, pour vérifier chaque entraînement en quelques secondes.
+
+## lisa-context
+tags: nlp, pos-tagging, low-resource, corsican, research, annotation
+en: Contributed to the lab's effort to build the first part-of-speech tagger for Corsican, a low-resource language with no standard spelling.
+fr: Contribution au travail du laboratoire pour construire le premier étiqueteur morphosyntaxique du corse, langue peu dotée sans orthographe standardisée.
 
 ## lisa-stack
 tags: flair, pytorch, python, awk, excel, ocr

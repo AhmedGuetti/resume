@@ -9,15 +9,27 @@ location: Seclin, France
 start: 2025-10
 end: 2026-09
 tags: [ai, agents, llm, python, qa, api-testing, ci-cd]
+conflicts:                # at most one bullet of each group on a resume (enforced)
+  - [overview, overview-three-projects]
+  - [overview-three-projects, bugpredict-ownership]
+  - [bugpredict-mcp, bugpredict-atlassian-lib]
+  - [argus-tools-cli, argus-tools]
+  - [cicd-both-projects, bugpredict-cicd, bugpredict-cicd-short]
+  - [cicd-both-projects, argus-cicd]
+  - [handover, bugpredict-handover]
+  - [handover, argus-handover]
 ---
 
 <!--
 Bullet bank: pick 4–6 sections per application, filtered by tags.
+Job title: the contract title is "Automation Engineer" (the HR system had no AI engineer
+title); the work itself was AI/ML engineering for the QA department, which the title above describes.
 Conventions:
   - Slugs are prefixed by project: atas-, bugpredict-, argus-, team-
   - Project order: aTaS (team of 5) → BugPredict (3 incl. PM) → ARGUS (solo)
   - "-short" = compact variant of the same fact (never use both)
   - tag "to-confirm" = not yet verified. Do not ship until confirmed.
+  - conflicts: see `conflicts:` in the front matter (checked by the code).
 -->
 
 ## overview
@@ -49,8 +61,8 @@ fr: Mise en place de l'étape human-in-the-loop : quand l'agent manque d'informa
 
 ## atas-dspy
 tags: dspy, prompt-optimization, llm
-en: Optimized the agent's prompts with DSPy.
-fr: Optimisation des prompts de l'agent avec DSPy.
+en: Prototyped automatic prompt optimisation for the agent with DSPy (beta, not shipped to production).
+fr: Prototype d'optimisation automatique des prompts de l'agent avec DSPy (bêta, non déployé en production).
 
 ## atas-ui
 tags: python, tkinter, ui, ux, qa
@@ -73,6 +85,17 @@ en: Refactored aTaS into an MVC architecture, separating the UI from the agent l
 fr: Refonte d'aTaS selon une architecture MVC, en séparant l'interface de la logique de l'agent.
 
 <!-- ============================ BUGPREDICT ============================ -->
+
+
+## atas-signals
+tags: python, tkinter, ui, software-architecture, concurrency, design-patterns
+en: Wrote an Observer-style signal system for Tkinter (inspired by PyQt's signals) so UI components communicate without direct coupling, and moved long LLM calls to background threads to keep the interface responsive.
+fr: Développement d'un système de signaux de type Observer pour Tkinter (inspiré de PyQt) pour que les composants d'interface communiquent sans couplage direct, et déport des appels LLM longs dans des threads d'arrière-plan pour garder l'interface réactive.
+
+## atas-structured-output
+tags: llm, pydantic, gemini, structured-output, reliability
+en: Added a Pydantic validation layer on Gemini's output, so generated test cases always follow a strict schema despite the model's randomness.
+fr: Ajout d'une couche de validation Pydantic sur la sortie de Gemini, pour que les cas de test générés respectent toujours un schéma strict malgré l'aléa du modèle.
 
 ## bugpredict-pitch
 tags: agents, langgraph, llm, python, bug-detection
@@ -98,6 +121,27 @@ fr: Développeur principal dans une équipe de 3 : responsable de la conception 
 tags: mcp, jira, confluence, integration
 en: Built a custom MCP server and client connecting the agents to Jira and Confluence, so context is retrieved automatically instead of pasted in.
 fr: Développement d'un serveur et d'un client MCP sur mesure reliant les agents à Jira et Confluence, pour récupérer le contexte automatiquement au lieu de le copier à la main.
+
+
+## bugpredict-atlassian-lib
+tags: mcp, python, software-architecture, jira, confluence, library, cli
+en: Packaged the Atlassian access as AtlassianMCP, a standalone 4-layer library (CLI host, client, Jira/Confluence services, MCP and HTTP transport) reused by BugPredict, ARGUS and notebooks without changes.
+fr: Accès Atlassian packagé dans AtlassianMCP, une bibliothèque autonome en 4 couches (hôte CLI, client, services Jira/Confluence, transport MCP et HTTP) réutilisée telle quelle par BugPredict, ARGUS et des notebooks.
+
+## bugpredict-modes
+tags: agents, specifications, security, code-review, qa
+en: Gave BugPredict three analysis modes: spec conflicts only, spec-vs-code compliance (missing, mismatched or partial features), and a full review adding security and architecture issues.
+fr: Trois modes d'analyse pour BugPredict : conflits dans la spécification seule, conformité spécification-code (fonctionnalités manquantes, divergentes ou partielles), et revue complète ajoutant les failles de sécurité et d'architecture.
+
+## bugpredict-gca
+tags: gemini, mcp, developer-tools, vs-code, prompt-engineering, documentation
+en: First prototype on Gemini Code Assist: connected it to Jira and Confluence through an MCP server inside VS Code, tuned the prompt with a domain expert, and documented the setup for developers and testers.
+fr: Premier prototype sur Gemini Code Assist : connexion à Jira et Confluence via un serveur MCP dans VS Code, prompt affiné avec un expert métier et documentation de la configuration pour développeurs et testeurs.
+
+## bugpredict-packaging
+tags: packaging, pyinstaller, software-architecture, deployment, reliability
+en: Shipped each agent as its own PyInstaller executable launched from the aTaS portal, so an agent's crash or dependency conflict never affects the portal or the other agents; validated API keys, MCP access and GCP auth at startup to fail fast.
+fr: Chaque agent livré comme un exécutable PyInstaller autonome lancé depuis le portail aTaS, pour qu'un plantage ou un conflit de dépendances n'affecte ni le portail ni les autres agents ; vérification des clés API, de l'accès MCP et de l'authentification GCP au démarrage (fail-fast).
 
 ## bugpredict-refactor
 tags: software-architecture, refactoring, python, pydantic, langgraph, plugin-architecture
@@ -190,6 +234,17 @@ fr: Conception de la couche de configuration YAML, avec substitution ${ENV_VAR} 
 tags: plugin-architecture, python, cli, click
 en: Added a plugin-based ToolRegistry so tools are registered without editing the engine, and a command-line interface built with Click.
 fr: Ajout d'un ToolRegistry à plugins pour enregistrer des outils sans modifier le moteur, et d'une interface en ligne de commande avec Click.
+
+
+## argus-node-factory
+tags: langgraph, agents, software-architecture, react-agents, design-patterns
+en: Built a node factory that turns each YAML stage into the right LangGraph node: human input, a single LLM call, or a ReAct tool loop with an iteration cap so a model can't loop forever.
+fr: Développement d'une fabrique de nœuds qui transforme chaque étape YAML en nœud LangGraph adapté : saisie humaine, appel LLM unique, ou boucle ReAct avec plafond d'itérations pour qu'un modèle ne boucle pas indéfiniment.
+
+## argus-tools
+tags: agents, tools, mcp, sandbox, web-search
+en: Shipped seven built-in tools (web search, file read/write, sandboxed code execution, and more) next to the MCP tools, all behind one registry interface.
+fr: Sept outils intégrés (recherche web, lecture et écriture de fichiers, exécution de code en sandbox, etc.) aux côtés des outils MCP, tous derrière une même interface de registre.
 
 ## argus-gcp
 tags: gcp, gemini, llm, langchain, security

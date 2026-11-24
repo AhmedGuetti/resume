@@ -9,15 +9,15 @@ kind: opener
 tags: [agents, llm, automation, ai, workflow, no-code, testing]
 by: claude
 en: >-
-  Over the past year, I built LLM agents for people outside engineering, mostly testers at
-  Magellan. The {job_title} role at {company} asks for that same mix: building the system,
-  and listening to the people who will use it.
+  Over the past year at Magellan, I built LLM agents for people outside engineering, mostly
+  testers. The {job_title} role at {company} asks for the same mix: building the system, and
+  listening to the people who will use it.
 fr: >-
-  Au cours de l'année passée, j'ai conçu des agents LLM pour des personnes extérieures à
-  l'ingénierie, principalement des testeurs chez Magellan. Le poste de {job_title} chez
+  Au cours de l'année passée chez Magellan, j'ai conçu des agents LLM pour des personnes
+  extérieures à l'ingénierie, principalement des testeurs. Le poste de {job_title} chez
   {company} demande ce même mélange : construire le système, et écouter les personnes qui
   l'utiliseront.
-translated_from: 47893011
+translated_from: 8655fd3a
 
 ## motivation-thread
 kind: motivation
@@ -27,15 +27,17 @@ by: claude
 en: >-
   The common thread in my work is making models useful to the people next to them. At LISA,
   that meant turning model errors into sheets that linguists could read. At Magellan, it
-  meant agents that pause and ask the tester when information is missing. [Add the real
-  reason in your own words: why this kind of work matters to you.]
+  meant agents that pause and ask the tester when information is missing. What I enjoy most
+  is the moment someone who doesn't write code uses a tool I built and saves time on their
+  own work. That is the kind of work I want to keep doing.
 fr: >-
   Le fil conducteur de mon travail, c'est de rendre les modèles utiles aux personnes qui
   travaillent avec eux. Au LISA, cela voulait dire transformer les erreurs du modèle en
   tableaux lisibles par des linguistes. Chez Magellan, des agents qui s'arrêtent pour
-  interroger le testeur quand une information leur manque. [Ajoutez la vraie raison, avec
-  vos mots : pourquoi ce travail compte pour vous.]
-translated_from: 372dace0
+  interroger le testeur quand une information leur manque. Ce que je préfère, c'est le
+  moment où quelqu'un qui ne code pas utilise un outil que j'ai construit et gagne du temps
+  sur son propre travail. C'est ce type de travail que je veux continuer à faire.
+translated_from: 6d22a4e0
 
 ## motivation-together
 kind: motivation
@@ -44,28 +46,28 @@ styles: [formal]
 by: claude
 en: >-
   Joining {company} would let me apply what I built at Magellan, agents connected to real
-  tools and evaluated against known bugs, to [what the team works on]. In return, I would
-  bring the habit of measuring a system before presenting it, as I did for BugPredict and
-  ARGUS. I am available from [date] for a [contract type].
+  tools and evaluated against known bugs, to the problems your team works on. In return, I
+  would bring the habit of measuring a system before presenting it, as I did for BugPredict
+  and ARGUS. I am available immediately for a full-time position.
 fr: >-
   Rejoindre {company} me permettrait de mettre ce que j'ai construit chez Magellan, des
-  agents connectés à de vrais outils et évalués sur des bugs connus, au service de [ce sur
-  quoi travaille l'équipe]. J'y apporterais l'habitude de mesurer un système avant de le
-  présenter, comme pour BugPredict et ARGUS. Je suis disponible à partir du [date] pour un
-  [type de contrat].
-translated_from: f8e6ce27
+  agents connectés à de vrais outils et évalués sur des bugs connus, au service des
+  problématiques de votre équipe. J'y apporterais l'habitude de mesurer un système avant de
+  le présenter, comme pour BugPredict et ARGUS. Je suis disponible immédiatement pour un
+  poste à temps plein.
+translated_from: 6a63abe9
 
 ## close-direct
 kind: close
 styles: [direct, story]
 by: claude
 en: >-
-  I am available from [date]. I would be glad to walk you through BugPredict or ARGUS in a
-  call, code included.
+  I am available immediately, and I would be glad to walk you through BugPredict or ARGUS in
+  a call, code included.
 fr: >-
-  Je suis disponible à partir du [date]. Je peux vous présenter BugPredict ou ARGUS lors
-  d'un échange, code à l'appui.
-translated_from: b6db12c4
+  Je suis disponible immédiatement, et je serais ravi de vous présenter BugPredict ou ARGUS
+  lors d'un échange, code à l'appui.
+translated_from: cf126d17
 
 ## close-warm
 kind: close
