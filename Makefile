@@ -6,7 +6,7 @@ PDFDIR := pdf
 DEFAULT_SEL := bank/selections/default.yaml
 BANK_SRC    := $(shell find bank -name '*.md') $(DEFAULT_SEL) $(shell find brain -name '*.py')
 
-.PHONY: all $(LANGS) watch view check text clean distclean apply tailor catalog shell
+.PHONY: all $(LANGS) watch view check text clean distclean apply tailor catalog shell web serve
 
 all: $(LANGS)
 
@@ -53,6 +53,13 @@ apply:
 tailor:
 	@test -n "$(SEL)" || { echo "usage: make tailor SEL=path/to/selection.yaml"; exit 1; }
 	python3 -m brain build $(SEL)
+
+# Web page of your applications: build the Svelte app once, then serve it
+web:
+	cd web && npm install && npm run build
+
+serve:
+	@python3 -m brain serve
 
 # Interactive shell (ninurta>)
 shell:

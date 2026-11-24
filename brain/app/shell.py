@@ -233,6 +233,13 @@ class Shell(cmd.Cmd):
         except KeyboardInterrupt:
             print("\ninterrupted")
 
+    def do_serve(self, line: str) -> None:
+        """serve [--port 8765]
+        Open a read-only web page of your applications at http://127.0.0.1:8765.
+        It lists them with fit score and verdict, and shows each one's facts, offer and PDFs.
+        Ctrl-C stops it and brings you back here."""
+        self.run("serve", line)
+
     def do_translate(self, line: str) -> None:
         """translate [--dry-run] [--stamp]
         Redo the French of the bank/letters/ paragraphs whose English changed.

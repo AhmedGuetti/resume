@@ -226,6 +226,7 @@ through each paragraph with questions and ways to start. How to write each part 
 | `build acme` | rebuild after editing `selection.yaml` |
 | `main` / `main check` | rebuild your main resume `pdf/resume-*.pdf` (like `make` / `make check`) |
 | `!git status` | run any system command without leaving the shell |
+| `serve` | read-only web page of your applications at http://127.0.0.1:8765 (build it once with `make web`) |
 | `catalog` | every entry, bullet id and skill in your bank |
 | `model off` | no AI for this session (`model config` to undo) |
 | `cost` / `usage` | what the AI cost this session / today / this month |
