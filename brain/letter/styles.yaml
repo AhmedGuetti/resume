@@ -1,0 +1,345 @@
+# The four cover letter styles. Edit freely: the coach reads this file every time.
+#
+# Each style is a plan of paragraphs. For each paragraph:
+#   purpose    what the paragraph must do (shown while you write)
+#   questions  answer these in your own words and the paragraph writes itself
+#   starters   example first sentences, per language; {company}, {job_title} and
+#              {project} are filled in when known, otherwise left as [company] etc.
+#   words      target length; the letter as a whole aims for ~350 words
+#   show       what to put next to you while writing:
+#                proof    the bullets of your bank that match the offer's requirements
+#                company  what the offer says about the role and the company
+#   fill       which kind of paragraph from bank/letters/ goes here when a letter is
+#              assembled: opener, story, motivation, close, or why (drafted from the offer)
+#   cues       words in an offer that point to this style (used to suggest one)
+
+direct:
+  name: Direct and plain
+  summary: Short sentences, facts first, no flattery. The reader knows in 10 seconds why you fit.
+  when: startups, scale-ups, product and engineering-led teams, offers written in a casual tone
+  tone: >-
+    Plain and confident. Short sentences. Every sentence carries a fact. No warm-up, no
+    compliments, no adjectives that a recruiter could not check.
+  salutation: {en: "Dear {recipient},", fr: "Bonjour {recipient},"}
+  recipient_default: {en: "Hiring Team", fr: "l'équipe de recrutement"}
+  signoff: {en: "Best regards,", fr: "Bien cordialement,"}
+  cues: [startup, start-up, scale-up, seed, series a, series b, fast-paced, small team, ship, shipping,
+         ownership, autonomy, remote-first, founders, early-stage, move fast, hands-on]
+  paragraphs:
+    - id: hook
+      fill: opener
+      title: What you do, and the match
+      purpose: >-
+        One or two sentences: what you build, and the one thing in the offer it answers.
+        No "I am applying for". The subject line already says that.
+      questions:
+        - "In one sentence, what do you build or do best?"
+        - "Which line of the offer made you think: that's exactly my work?"
+      starters:
+        en:
+          - "I build {project}-style systems that teams actually use, which is what the {job_title} role asks for."
+          - "Your offer asks for someone who [requirement]. That is what I have done for the past year at [company]."
+          - "I turn LLM prototypes into tools people rely on every day."
+        fr:
+          - "Je construis des systèmes comme {project}, utilisés au quotidien par des équipes : c'est ce que demande le poste de {job_title}."
+          - "Votre offre cherche quelqu'un qui [exigence]. C'est ce que je fais depuis un an chez [entreprise]."
+      words: [50, 80]
+    - id: proof
+      fill: story
+      title: One piece of proof
+      purpose: >-
+        One project, told with numbers: the problem, what you did yourself, the result.
+        Not a list of skills: the resume already has them.
+      questions:
+        - "Which single project best proves you can do this job?"
+        - "What was broken or missing before you started?"
+        - "What did YOU do (not the team)?"
+        - "What number shows it worked (users, precision, time saved, teams)?"
+      starters:
+        en:
+          - "At [company], I [built / redesigned / took over] {project}: [what it does]."
+          - "The clearest example is {project}. [The problem], so I [what you did]. [The result, with a number]."
+          - "Before {project}, [the problem]. I [what you did], and today [the result]."
+        fr:
+          - "Chez [entreprise], j'ai [conçu / repris / refondu] {project} : [ce que ça fait]."
+          - "L'exemple le plus parlant est {project}. [Le problème], alors j'ai [ce que vous avez fait]. [Le résultat, chiffré]."
+      words: [130, 170]
+      show: proof
+    - id: why
+      fill: why
+      title: Why them
+      purpose: >-
+        One specific thing about this company or this team, and what you would do with it.
+        If the sentence would still be true with another company's name in it, it's too vague.
+      questions:
+        - "What is specific to this company: its product, its users, a problem it has?"
+        - "What would you work on first if you got the job?"
+      starters:
+        en:
+          - "What interests me at {company} is [specific thing]. I'd like to [what you would do]."
+          - "{company} [does something specific]; the part I'd want to own is [part]."
+        fr:
+          - "Ce qui m'intéresse chez {company}, c'est [élément précis]. J'aimerais [ce que vous feriez]."
+          - "{company} [fait quelque chose de précis] ; la partie que j'aimerais prendre en charge, c'est [partie]."
+      words: [75, 105]
+      show: company
+    - id: close
+      fill: close
+      title: The ask
+      purpose: >-
+        Ask for the next step, plainly. Mention availability if it matters (start date, location).
+      questions:
+        - "When can you start, and does location or contract matter?"
+      starters:
+        en:
+          - "I'm available from [date]. I'd be glad to walk you through {project} in a call."
+          - "Happy to show you the code or a demo whenever suits you."
+        fr:
+          - "Je suis disponible à partir du [date]. Je peux vous présenter {project} lors d'un échange."
+      words: [30, 50]
+
+warm:
+  name: Warm and personal
+  summary: Motivation first, then proof. Shows who you are, still concrete.
+  when: mission-driven companies, health, education, non-profits, offers that talk about values and culture
+  tone: >-
+    Friendly and sincere, first person, a bit of personality. Motivation is told through a real
+    reason or moment, never through enthusiasm words. Still one fact per sentence.
+  salutation: {en: "Dear {recipient},", fr: "Bonjour {recipient},"}
+  recipient_default: {en: "Hiring Team", fr: "l'équipe de recrutement"}
+  signoff: {en: "Warm regards,", fr: "Bien cordialement,"}
+  cues: [mission, values, impact, culture, community, purpose, care, patients, healthcare, hospital, education,
+         non-profit, association, inclusive, diversity, wellbeing, people-first, our story]
+  paragraphs:
+    - id: hook
+      fill: motivation
+      title: Your real reason
+      purpose: >-
+        Why this role, told as a real reason: a moment, a user you met, a problem you care about.
+        Show the motivation, don't announce it.
+      questions:
+        - "When did you first care about the problem this company works on?"
+        - "Is there a moment from your work where you thought: this is the kind of thing I want to do?"
+      starters:
+        en:
+          - "During my internship at [company], I [moment]. Since then I've wanted to [what you want to do]."
+          - "The first time [moment], I realised [what you realised]."
+          - "I came to [field] through [unexpected path]."
+        fr:
+          - "Pendant mon stage chez [entreprise], j'ai [moment]. Depuis, j'ai envie de [ce que vous voulez faire]."
+          - "La première fois que [moment], j'ai compris [ce que vous avez compris]."
+      words: [60, 90]
+    - id: proof
+      fill: story
+      title: What you've done
+      purpose: >-
+        The project that connects your reason to the job: what you did and what changed for the
+        people who used it.
+      questions:
+        - "Which project is closest to what this company does?"
+        - "Who used what you built, and what changed for them?"
+      starters:
+        en:
+          - "That's what I worked on with {project}: [what you did]. [What changed for the users]."
+          - "At [company], I [what you did], so that [who] could [what they could now do]."
+        fr:
+          - "C'est ce sur quoi j'ai travaillé avec {project} : [ce que vous avez fait]. [Ce qui a changé pour les utilisateurs]."
+          - "Chez [entreprise], j'ai [ce que vous avez fait], pour que [qui] puisse [ce qu'ils peuvent faire maintenant]."
+      words: [120, 160]
+      show: proof
+    - id: how
+      fill: why
+      title: How you work, and why them
+      purpose: >-
+        How you like to work (with users, with non-engineers, in a team) and why this team in
+        particular. One concrete example beats three qualities.
+      questions:
+        - "Who do you like working with, and how (users, linguists, testers, doctors)?"
+        - "What about this company's way of working appeals to you, from the offer?"
+      starters:
+        en:
+          - "I do my best work close to the people who use the tool: [example]."
+          - "What draws me to {company} is [specific thing from the offer]."
+        fr:
+          - "Je travaille le mieux au plus près des utilisateurs : [exemple]."
+          - "Ce qui m'attire chez {company}, c'est [élément précis de l'offre]."
+      words: [75, 105]
+      show: company
+    - id: close
+      fill: close
+      title: Closing
+      purpose: Thank them briefly and ask for a conversation.
+      questions:
+        - "What would you like to talk about first in an interview?"
+      starters:
+        en:
+          - "I'd love to tell you more about {project} and hear about the team's plans."
+          - "Thank you for reading. I'd be glad to talk whenever suits you."
+        fr:
+          - "J'aimerais beaucoup vous en dire plus sur {project} et découvrir les projets de l'équipe."
+      words: [30, 50]
+
+formal:
+  name: Formal and classic
+  summary: Traditional letter register, the norm in French corporate and public-sector hiring.
+  when: large groups, banks, public sector, research institutions, French corporate offers, consulting
+  tone: >-
+    Formal and precise, polite register, complete sentences, "vous" in French. Classic structure
+    (vous / moi / nous) but with real facts: no empty courtesy phrases beyond the opening and the
+    closing formula.
+  salutation: {en: "Dear {recipient},", fr: "{recipient},"}
+  recipient_default: {en: "Sir or Madam", fr: "Madame, Monsieur"}
+  signoff:
+    en: "Yours faithfully,"
+    fr: "Je vous prie d'agréer, Madame, Monsieur, l'expression de mes salutations distinguées."
+  cues: [groupe, group, bank, banque, assurance, insurance, ministère, public, fonction publique, cnrs, inria,
+         chu, hôpital, consulting, conseil, cabinet, defense, défense, aerospace, aéronautique,
+         "h/f", "f/h", cdi, poste à pourvoir, nous recherchons]
+  paragraphs:
+    - id: you
+      fill: why
+      title: Them (vous)
+      purpose: >-
+        Name the position and show you understand what the company needs: one fact about the
+        company or the team, and the challenge the role is there to solve.
+      questions:
+        - "What does the company do, in one sentence, and where does this role fit?"
+        - "What challenge does the offer describe?"
+      starters:
+        en:
+          - "{company} is [what the company does]; the {job_title} position you are offering is about [challenge]."
+          - "Your team is [what they are doing], and you are looking for a {job_title} to [challenge]."
+        fr:
+          - "{company} [ce que fait l'entreprise] ; le poste de {job_title} que vous proposez vise à [enjeu]."
+          - "Votre équipe [ce qu'elle fait], et vous recherchez un(e) {job_title} pour [enjeu]."
+      words: [60, 90]
+      show: company
+    - id: me
+      fill: story
+      title: You (moi)
+      purpose: >-
+        Your background and one or two achievements that answer that challenge, with numbers.
+      questions:
+        - "What is your current situation (degree, work-study, availability)?"
+        - "Which one or two achievements answer the challenge you just described?"
+      starters:
+        en:
+          - "Currently a [situation] at [company], I [achievement with a number]."
+          - "During my [work-study / internship] at [company], I [achievement]."
+        fr:
+          - "Actuellement [situation] chez [entreprise], j'ai [réalisation chiffrée]."
+          - "Au cours de mon [alternance / stage] chez [entreprise], j'ai [réalisation]."
+      words: [130, 170]
+      show: proof
+    - id: us
+      fill: motivation
+      title: Together (nous)
+      purpose: >-
+        What you would bring to the team concretely, and what the role would bring you. Mention
+        availability and the contract if relevant.
+      questions:
+        - "What would you take on first in this team?"
+        - "What would this role teach you or let you do that you can't do now?"
+      starters:
+        en:
+          - "Joining {company} would allow me to [what you'd do], and to bring [what you bring]."
+          - "I am available from [date] for [contract]."
+        fr:
+          - "Rejoindre {company} me permettrait de [ce que vous feriez], tout en apportant [ce que vous apportez]."
+          - "Je suis disponible à partir de [date] pour [type de contrat]."
+      words: [70, 100]
+    - id: close
+      fill: close
+      title: Request for an interview
+      purpose: Ask for an interview in one sentence. The closing formula is added for you.
+      questions:
+        - "Anything to add (attached documents, references)?"
+      starters:
+        en:
+          - "I would welcome the opportunity to discuss my application with you in an interview."
+        fr:
+          - "Je souhaiterais vous exposer plus en détail mes motivations lors d'un entretien."
+          - "Je me tiens à votre disposition pour un entretien à votre convenance."
+      words: [25, 45]
+
+story:
+  name: Engineer's story
+  summary: Opens on a problem you solved and lets the story carry the letter.
+  when: R&D teams, research labs, AI/ML and deep-tech roles, offers that describe hard technical problems
+  tone: >-
+    Technical narrative. Open in the middle of a real problem, explain the decision you made and
+    why, land on a measurable result, then connect it to their problem. Precise vocabulary,
+    no buzzwords.
+  salutation: {en: "Dear {recipient},", fr: "Bonjour {recipient},"}
+  recipient_default: {en: "Hiring Team", fr: "l'équipe de recrutement"}
+  signoff: {en: "Best regards,", fr: "Bien cordialement,"}
+  cues: [research, r&d, recherche, phd, thèse, laboratory, laboratoire, benchmark, evaluation, state of the art,
+         state-of-the-art, hard problems, deep tech, algorithm, algorithme, model, modèle, inference,
+         machine learning, llm, agents, nlp]
+  paragraphs:
+    - id: problem
+      fill: opener
+      title: The problem
+      purpose: >-
+        Drop the reader into a real technical problem you faced, in two or three sentences.
+        Specific enough that only you could have written it.
+      questions:
+        - "What was the hardest technical problem in your best project?"
+        - "What made it hard (data, ambiguity, scale, users)?"
+      starters:
+        en:
+          - "Most bugs in [project] didn't come from the code but from [cause]."
+          - "The model was right 90% of the time, and the remaining 10% all had the same cause: [cause]."
+          - "[Situation]. Nobody could tell why until [what you found]."
+        fr:
+          - "La plupart des bugs de [projet] ne venaient pas du code, mais de [cause]."
+          - "Le modèle avait raison 90 % du temps, et les 10 % restants avaient tous la même cause : [cause]."
+      words: [60, 90]
+    - id: solution
+      fill: story
+      title: What you did, and the result
+      purpose: >-
+        The decision you made, why, and the measured result. One or two technical details that
+        show you understood the problem, not a list of tools.
+      questions:
+        - "What did you try, and what was the decision that made it work?"
+        - "How did you measure the result, and what was the number?"
+      starters:
+        en:
+          - "So I [what you did]: [the key technical decision], because [why]."
+          - "Instead of [obvious approach], I [your approach]. [The result, with a number]."
+        fr:
+          - "J'ai donc [ce que vous avez fait] : [la décision technique clé], parce que [pourquoi]."
+          - "Plutôt que [approche évidente], j'ai [votre approche]. [Le résultat, chiffré]."
+      words: [120, 160]
+      show: proof
+    - id: link
+      fill: why
+      title: Their problem
+      purpose: >-
+        Connect your story to a problem in the offer. Show you read it closely.
+      questions:
+        - "Which problem in the offer looks like the one you solved?"
+        - "What would you do the same way, and what differently?"
+      starters:
+        en:
+          - "Your team faces a similar problem with [their problem]."
+          - "Reading your offer, [their problem] sounds like the same kind of problem."
+        fr:
+          - "Votre équipe fait face à un problème proche avec [leur problème]."
+          - "En lisant votre offre, [leur problème] m'a semblé être le même type de problème."
+      words: [75, 105]
+      show: company
+    - id: close
+      fill: close
+      title: The ask
+      purpose: Offer to go deeper in a conversation, and ask for it.
+      questions:
+        - "What part of your work would you like to go into in detail?"
+      starters:
+        en:
+          - "I'd be glad to go through the evaluation in detail in a call."
+          - "Happy to walk you through the architecture and what I'd change today."
+        fr:
+          - "Je peux entrer dans le détail de [sujet] lors d'un échange, si cela vous intéresse."
+      words: [30, 50]

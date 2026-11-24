@@ -5,10 +5,13 @@ scripted runs never hang waiting for input.
 """
 from __future__ import annotations
 
+import datetime as dt
 import sys
 
 from ..offer.dedup import find_url, job_key
+from ..offer.parsing import parse_applicants
 from ..offer.record import JobRecord
+from ..score.competition import Snapshot, parse_seniority
 
 # What we ask for when the offer doesn't say (the link is asked first, by ask_link).
 ASK_FIELDS = ["company", "job_title", "location", "salary", "posted", "applicants"]
@@ -104,3 +107,47 @@ def print_job(record: JobRecord) -> None:
     posted = record.posted
     show_field("posted", posted and (f"{posted.text} ({posted.date})" if posted.date else posted.text))
     show_field("applicants", record.applicants and record.applicants.text)
+
+
+def _shares(seniority: dict[str, float]) -> str:
+    return ", ".join(f"{lvl} {pct:g}%" for lvl, pct in seniority.items())
+
+
+def ask_competition(record: JobRecord) -> Snapshot | None:
+    """How many applicants, and their seniority (LinkedIn's applicant insights).
+    Enter keeps the last values. Returns a new snapshot, or None if nothing changed."""
+    last = record.competition[-1] if record.competition else None
+    count = last.applicants if last else (record.applicants.count if record.applicants else None)
+    at_least = last.at_least if last else (record.applicants.at_least if record.applicants else None)
+    seniority = dict(last.seniority) if last else {}
+    if sys.stdin.isatty():
+        print("Competition (from the job page on LinkedIn; Enter keeps what's in brackets):")
+        try:
+            shown = f"{count}{'+' if at_least else ''}" if count else "-"
+            answer = input(f"  Applicants [{shown}]: ").strip()
+            parsed = parse_applicants(answer) if answer else None
+            if parsed:
+                count, at_least = parsed["count"], parsed["at_least"]
+            elif answer:
+                print("   note: no number in that, kept the previous value")
+            print(f"  Seniority of the applicants [{_shares(seniority) or '-'}]:")
+            print("  paste LinkedIn's breakdown, or type e.g. \"entry 45, senior 30\"; end with an empty line")
+            lines = []
+            while True:
+                line = input()
+                if not line.strip():
+                    break
+                lines.append(line)
+        except EOFError:
+            lines = []
+        if lines:
+            read = parse_seniority("\n".join(lines))
+            if read:
+                seniority = read
+            else:
+                print("   note: couldn't read a breakdown in that, kept the previous one")
+    if count is None and not seniority:
+        return None
+    if last and (last.applicants, last.at_least, last.seniority) == (count, at_least, seniority):
+        return None
+    return Snapshot(date=dt.date.today(), applicants=count, at_least=at_least, seniority=seniority)

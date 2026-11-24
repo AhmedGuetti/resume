@@ -15,6 +15,8 @@ label: Languages | Langages
 - TypeScript/JavaScript
 - SQL
 - AWK
+- GLSL
+- PHP
 
 ## ai-ml
 label: AI/ML | IA/ML
@@ -34,11 +36,18 @@ label: AI/ML | IA/ML
 - machine translation | traduction automatique
 - information extraction | extraction d'information
 - OCR
+- diffusion models and flow matching (image restoration) | modèles de diffusion et flow matching (restauration d'images)
+- annotation (INCEpTION) | annotation (INCEpTION)
 
 ## tools
 label: Tools | Outils
 - OpenGL
 - FastAPI
+- Docker
+- Apache (reverse proxy)
+- PyInstaller
+- Eigen
+- jQuery / DataTables
 - React
 - React Flow
 - Zustand

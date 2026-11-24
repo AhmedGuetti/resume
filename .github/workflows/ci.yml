@@ -34,8 +34,15 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
             texlive-luatex texlive-latex-extra texlive-lang-french latexmk chktex \
-            poppler-utils fonts-adobe-sourcesans3
+            poppler-utils unzip
+      - name: Install Source Sans 3 (the resume font; Ubuntu has no package for it)
+        run: |
+          curl -fsSL -o /tmp/source-sans.zip \
+            https://github.com/adobe-fonts/source-sans/releases/download/3.052R/OTF-source-sans-3.052R.zip
+          sudo mkdir -p /usr/local/share/fonts/source-sans
+          sudo unzip -q -o -j /tmp/source-sans.zip '*.otf' -d /usr/local/share/fonts/source-sans
           fc-cache -f
+          fc-list | grep -q "Source Sans 3" || { echo "Source Sans 3 not installed"; exit 1; }
       - name: Build both languages
         run: make -B all
       - name: Generated .tex match the bank

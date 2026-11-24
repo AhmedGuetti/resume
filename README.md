@@ -11,6 +11,8 @@ If you're just here to read the resume, grab the PDF:
 - [English](pdf/resume-en.pdf)
 - [Français](pdf/resume-fr.pdf)
 
+New here and want to use it for your own resume? Start with the [Quickstart](QUICKSTART.md).
+
 The rest of this README is mostly a note to future me on how it all works.
 
 ## Layout
@@ -20,7 +22,9 @@ bank/              all the content, as Markdown (see bank/README.md)
 brain/             the Python side: reads the bank, picks content for an offer, builds PDFs
 config.example.yaml  copy to config.yaml (git-ignored) for the LLM model and API keys
 cv/
-  resume.cls       shared layout and macros (\cvheader, \cventry, \cvskill, ...)
+  ninurta.sty      font, accent color and header, shared by the resume and the letter
+  resume.cls       resume layout and macros (\cventry, \cvskill, ...)
+  coverletter.cls  cover letter layout (cv/company/<name>/letter.md -> letter-<lang>.pdf)
   resume-en.tex    English version (generated from bank/, don't edit)
   resume-fr.tex    French version  (generated from bank/, don't edit)
   company/<name>/  tailored resumes, one folder per application (not in git)
@@ -89,22 +93,37 @@ ninurta> help
 ```
 
 Up/down arrows recall earlier commands and Tab completes command and company names.
+The shell covers the whole workflow, so you never have to leave it: `apply`, `resume`
+and `letter` for an application, `edit acme letter` to open a file in your editor, `build`
+to rebuild after editing, `main` to rebuild your main resume (like `make`), `open`, `list`,
+and `!command` for anything else (`!git status`). Tab completes commands, company names,
+`--flags` and their values (`--only `, `--lang `). `help` lists everything.
+
 Everything also works as a one-off command, e.g. `make apply COMPANY="Company X" OFFER=offer.txt`
 or `python -m brain apply "Company X"` (which asks you to paste the offer).
 
-`apply` creates `cv/company/<company>/` with:
+`apply` makes both documents, in the language of the offer: a French offer gets a French
+resume and a French cover letter, an English offer English ones. The language comes from
+the offer (read by the model, or guessed from its words without AI); `--lang en|fr` forces
+it. `--only resume` or `--only letter` makes just one of the two; `letter <company>` makes
+or redoes the letter later.
+
+It creates `cv/company/<company>/` with (for a French offer):
 
 ```
 offer.md          the offer text
-job.json          the facts of the offer (see below)
+job.json          the facts of the offer (see below), including its language
 selection.yaml    what was picked, the keywords that matched, and what was added or dropped
+letter.md         the cover letter, each paragraph's source in a comment, to edit
 pdf/
-  resume-en.pdf   tailored resume, English
-  resume-fr.pdf   tailored resume, French
+  resume-fr.pdf   tailored resume
+  letter-fr.pdf   cover letter
 tex/
-  resume-en.tex   the LaTeX they were built from (LaTeX's temporary files go in tex/.build/)
-  resume-fr.tex
+  resume-fr.tex   the LaTeX it was built from (LaTeX's temporary files go in tex/.build/)
 ```
+
+The other language is one command away: `build <company> --lang en` for the resume,
+`letter <company> --lang en` for the letter.
 
 **The facts of the offer (`job.json`).** The LLM reads the company, job title, location,
 work mode, contract, seniority, experience and degree asked, salary, posting date,
@@ -133,7 +152,8 @@ if that name is taken, so an earlier application is never overwritten.
 **Who picks the content.** An LLM reads the offer and the bank and chooses which bullets,
 projects and skills to use, most relevant first. It only chooses: it never writes resume
 text, and any id it makes up is dropped (and reported). Bullets tagged `to-confirm` are
-never shown to it, and a bullet and its `-short` variant never end up on the same page.
+never shown to it, and a bullet and its `-short` variant never end up on the same page, nor
+two bullets of a `conflicts:` group (declared in the bank file's front matter).
 Without a model, or with `--no-ai`, plain keyword matching does the job: it looks for the
 bank's tags and skill names in the offer, with a few English/French synonyms.
 
@@ -143,6 +163,7 @@ bank's tags and skill names in the offer, with a few English/French synonyms.
 models:
   extract: deepseek:deepseek-chat     # read the offer's facts
   select: deepseek:deepseek-chat      # pick the resume content
+  score: deepseek:deepseek-chat       # judge the fit (default: the select model)
   fallback: gemini:gemini-3.6-flash   # only when DeepSeek fails or answers badly
 budget:
   daily: 0.50                         # $; when reached, apply goes on without AI
@@ -175,6 +196,31 @@ make apply COMPANY="Company X" OFFER=offer.txt NOAI=1                        # k
 or, if there's room left, adds the next most relevant bullets and projects one at a time,
 keeping each one that still fits on one page in both languages (`--no-fill` skips this).
 
+**Where you stand.** At the end, `apply` scores how well you fit the offer and saves it in
+`job.json`:
+
+- **Fit (0-100)**: each required and nice-to-have skill of the offer is judged met / partial /
+  missing (50 and 15 points), plus your years of experience against the years asked (15),
+  your level against the level asked (10) and your degree against the one asked (10). A part
+  the offer doesn't mention is left out, not counted against you. With AI, the model judges
+  each requirement but must cite bullets or skills of your bank as evidence; anything without
+  valid evidence counts as missing. Without AI, keyword matching does it.
+- **Two numbers**: the fit of what's on this resume, and of everything in your bank. The gap is
+  what the tailoring left out (it's listed).
+- **You** are computed from the bank: years of experience from the dates in
+  `bank/experiences/` (overlaps counted once), degree from `bank/education/`. Your level is
+  guessed from the years, or set it with `seniority: entry` in `bank/profile.md`.
+- **Competition**: you're asked how many people applied and LinkedIn's seniority breakdown
+  (paste LinkedIn's text as is, or type `entry 45, senior 30`). Each answer is a dated
+  snapshot, so you can follow a job filling up.
+- **Position**: strong / possible / long shot, from the fit and how many applicants are more
+  senior than you, with the reasons written out. Use it to compare your applications, not as
+  a prediction.
+
+The numbers change: run `python -m brain score company-x` (or `score company-x` in the shell) to update the
+competition and re-score. `list` shows every application's fit and verdict, `show` the details.
+`apply --no-score` skips this step.
+
 The result is a starting point. Edit `selection.yaml` if you disagree, then rebuild:
 
 ```bash
@@ -189,7 +235,9 @@ brain/
   bank/      the content (bank/*.md) and Selection: what goes on one resume
   offer/     a job offer: facts checked against its text, job.json, already applied?
   pick/      choose content for an offer (keywords or LLM), fit it on one page
+  score/     fit score against the offer, competition, position
   render/    selection -> LaTeX -> PDF
+  letter/    cover letters: styles, bank/letters/ paragraphs, assembling, checks, letter.md -> PDF
   llm/       one client per provider, fallback chain, spending log and budget
   app/       the CLI, the `apply` pipeline step by step, the ninurta> shell
   paths.py   where everything lives
@@ -198,6 +246,45 @@ brain/
 ```
 
 Each folder's `__init__.py` lists what its files do; `brain/__init__.py` has the overall map.
+
+## The cover letter
+
+Cover letters are assembled from paragraphs I write once, in
+[bank/letters/](bank/letters/README.md): one file per bank entry, with openers and stories
+about each project, plus `general.md` for motivation and closings.
+
+```
+ninurta> letter company-x      # assemble the letter for that application
+ninurta> translate             # after rewriting English paragraphs: redo their French
+```
+
+- **Style.** Four styles ([brain/letter/styles.yaml](brain/letter/styles.yaml)): *direct and
+  plain*, *warm and personal*, *formal and classic*, *engineer's story*. A model suggests one
+  for the company and must quote the offer to back it (keyword cues without AI); I choose.
+  Each style is four slots, and each slot says which kind of paragraph fills it.
+- **Picking.** For each slot, the paragraph of my bank that fits the offer best: a model
+  picks (ids it makes up, or of the wrong kind, are dropped), or tag matching plus the fit
+  score's evidence without AI. I see the picks and can swap any of them.
+- **What the AI writes.** `{company}` and `{job_title}` are filled in from the offer. The
+  story gets at most one linking sentence at its end, naming the company or the role: my
+  text is never changed. The "why them" paragraph is drafted from the offer and marked for me
+  to rewrite: every number must be in the offer, and in a letter in another language than
+  the offer, pasting the offer's words is refused.
+- **French.** Each paragraph has `en:` and `fr:`. When I change the English, its French is
+  out of date (a hash of the English is stored next to it); `translate` redoes those, keeping
+  every number and placeholder, and `translate --stamp` marks French I fixed by hand.
+- **Checks** ([brain/letter/lint.py](brain/letter/lint.py)): cliché openers, em dashes and
+  other AI tells, sentences that list skills or copy a resume bullet, length, and my own
+  banned phrases (`bank/voice.md`). They point; they never rewrite.
+- **Result.** `cv/company/<name>/letter.md`, in the offer's language (`--lang` to change it),
+  with each paragraph's source and what the AI did in a comment above it. Edit it, then
+  `letter <name> --build`. It's built with [cv/coverletter.cls](cv/coverletter.cls), which
+  shares [cv/ninurta.sty](cv/ninurta.sty) (font, accent color, header) with the resume.
+- `letter <name> --write` writes it paragraph by paragraph instead, with questions, ways to
+  start and the checks after each one; `--skeleton` puts that guidance in `letter.md` as
+  comments, for an editor; `--no-adapt` adds no sentence; `--check` only runs the checks.
+
+How to write each part well, with examples: [LETTERS.md](LETTERS.md).
 
 ## Editing
 

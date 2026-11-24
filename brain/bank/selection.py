@@ -94,3 +94,17 @@ class Selection(_Strict):
 
     def to_dict(self) -> dict:
         return self.model_dump(exclude_none=True)
+
+    def clashes(self, bank: dict) -> list[str]:
+        """Bullets on this resume that say the same thing (a -short twin, or a `conflicts:`
+        group of the bank). One line each, e.g. 'experience/acme: overview and overview-short'.
+        An entry without a `bullets:` list counts as every bullet of the bank entry."""
+        found = []
+        for section in ENTRY_SECTIONS:
+            for pick in self.entries(section):
+                entry = bank[section].get(pick.id)
+                if entry is None:
+                    continue                    # render reports unknown entries
+                ids = list(entry.bullets) if pick.bullets is None else pick.bullet_ids()
+                found += [f"{section}/{pick.id}: {a} and {b}" for a, b in entry.clashes(ids)]
+        return found

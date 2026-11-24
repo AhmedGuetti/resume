@@ -22,7 +22,7 @@ from pydantic import BaseModel, Field, ValidationError, field_validator
 
 from ..llm import LLM
 from ..llm.answers import parse_json
-from .parsing import APPLICANTS_RE, POSTED_RE, in_offer
+from .parsing import APPLICANTS_RE, POSTED_RE, guess_language, in_offer, normalize_language
 
 # Facts with one value each. The model returns {"value": ..., "quote": "..."} for these.
 SCALAR_FIELDS = {
@@ -142,6 +142,9 @@ def extract(offer: str, llm: LLM | None) -> tuple[dict, list[str]]:
                 else:
                     notes.append(f"dropped from {name}: {phrase!r} (not in the offer)")
             info[name] = kept
+
+    # The language decides the resume's and the letter's language: always set it.
+    info["language"] = normalize_language(info["language"]) or guess_language(offer)
 
     # Posting date and applicants: plain patterns work even without an LLM.
     if not info["posted"]:

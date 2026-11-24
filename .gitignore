@@ -22,3 +22,6 @@ __pycache__/
 # API keys
 config.yaml
 .env
+
+# Personal reports and source documents (local only)
+doc/

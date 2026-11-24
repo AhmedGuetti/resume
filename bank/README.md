@@ -11,6 +11,8 @@ bank/
   experiences/<company>.md   one file per job / internship
   projects/<project>.md      one file per project
   selections/default.yaml    the general-purpose resume (pdf/resume-*.pdf)
+  letters/                   cover letter paragraphs, one file per entry (see letters/README.md)
+  voice.md                   how I write, for the cover letter coach
 ```
 
 This folder is the only place resume content lives: `make` regenerates
@@ -33,6 +35,9 @@ location: Seclin, France      # a plain value is used for both languages
 start: 2025-10                # YYYY, YYYY-MM or `present`
 end: 2026-09                  # education entries usually only have `end`
 tags: [ai, agents, qa]
+conflicts:                    # bullets that say the same thing: at most one per group
+  - [overview, overview-three-projects]
+  - [cicd-both-projects, bugpredict-cicd, bugpredict-cicd-short]
 ---
 
 ## bugpredict-refactor-short
@@ -44,6 +49,11 @@ fr: **BugPredict :** conception d'un pipeline multi-agents de détection de bugs
 - Each `## id` is one bullet. The id is how a selection refers to it, so keep it stable.
 - `en:` and `fr:` are both required and must each fit on one line.
 - `tags:` are free-form keywords to help match bullets to a job offer. They never appear on the resume.
+- `conflicts:` (optional) lists groups of bullets that say the same thing. At most one bullet
+  of each group goes on a resume: the keyword pick, the model's pick and the page filling all
+  respect it, the model is told about the groups, and `build` warns if a hand-edited
+  selection breaks one. Every id must exist in the file. `x` and `x-short` never need a group:
+  they always clash.
 - Text is plain Unicode with `**bold**` and `` `code` `` only. Characters like `%`, `&`, `_` and `~` are escaped for LaTeX automatically.
 - Several bullets can describe the same work from different angles (say, one technical and one
   results-focused); a selection picks whichever fits the offer.

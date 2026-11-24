@@ -15,7 +15,7 @@ from __future__ import annotations
 import re
 from functools import lru_cache
 
-from ..bank import Bullet, Entry, EntryPick, Selection, SkillPick, usable, variant_base
+from ..bank import Bullet, Entry, EntryPick, Selection, SkillPick, usable
 from .report import BulletKey, MatchReport
 
 # Words an offer may use for a bank keyword. Keys are bank keywords (lowercase).
@@ -67,7 +67,8 @@ def skill_keywords(name: str) -> list[str]:
     return [re.sub(r"\s+", "-", p) for p in parts if len(p) >= 3]
 
 
-def found_keywords(bank: dict, offer: str) -> set[str]:
+def bank_keywords(bank: dict) -> set[str]:
+    """Every keyword the bank knows: all tags, plus the pieces of every skill name."""
     keywords = set()
     for kind in ("education", "experience", "projects"):
         for entry in bank[kind].values():
@@ -77,7 +78,11 @@ def found_keywords(bank: dict, offer: str) -> set[str]:
     for group in bank["skills"].values():
         for item in group.items:
             keywords.update(skill_keywords(item["en"]))
-    return {k for k in keywords if mentions(offer, k)}
+    return keywords
+
+
+def found_keywords(bank: dict, offer: str) -> set[str]:
+    return {k for k in bank_keywords(bank) if mentions(offer, k)}
 
 
 def score_bullet(bullet: Bullet, found: set[str]) -> int:
@@ -90,11 +95,10 @@ def pick_bullets(entry: Entry, found: set[str]) -> list[tuple[str, int]]:
     """Best bullets first; always at least one so the entry isn't empty."""
     scored = [(bid, score_bullet(b, found)) for bid, b in entry.bullets.items() if usable(b)]
     ranked = sorted(scored, key=lambda s: -s[1])          # stable: ties keep file order
-    keep, bases = [], set()
-    for bid, score in ranked:                             # never a bullet and its -short twin
-        if score > 0 and variant_base(bid) not in bases and len(keep) < MAX_BULLETS_PER_ENTRY:
+    keep = []
+    for bid, score in ranked:                 # never two bullets that clash (-short twin, conflicts:)
+        if score > 0 and len(keep) < MAX_BULLETS_PER_ENTRY and not entry.clash(bid, [k for k, _ in keep]):
             keep.append((bid, score))
-            bases.add(variant_base(bid))
     return keep or ranked[:1]
 
 

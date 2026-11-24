@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from typing import Union
 
-from ..bank import EntryPick, Selection, usable, variant_base
+from ..bank import EntryPick, Selection, usable
 from .report import BulletKey, MatchReport
 
 
@@ -43,9 +43,10 @@ def fill_candidates(bank: dict, sel: Selection, report: MatchReport) -> list[Can
     candidates = []
     for section, rank in section_rank.items():
         for entry in sel.entries(section):
-            on_page = {variant_base(b) for b in entry.bullet_ids()}
-            for bid, bullet in bank[section][entry.id].bullets.items():
-                if usable(bullet) and variant_base(bid) not in on_page:
+            bank_entry = bank[section][entry.id]
+            on_page = entry.bullet_ids()
+            for bid, bullet in bank_entry.bullets.items():
+                if usable(bullet) and bid not in on_page and not bank_entry.clash(bid, on_page):
                     key = BulletKey(section, entry.id, bid)
                     candidates.append((report.bullets[key], rank, key))
     on_page = {p.id for p in sel.projects}
@@ -56,11 +57,14 @@ def fill_candidates(bank: dict, sel: Selection, report: MatchReport) -> list[Can
     return [c[2] for c in candidates]
 
 
-def add(sel: Selection, bank: dict, report: MatchReport, candidate: Candidate) -> str:
-    """Put a candidate on the page. Returns a label for messages."""
+def add(sel: Selection, bank: dict, report: MatchReport, candidate: Candidate) -> str | None:
+    """Put a candidate on the page. Returns a label for messages, or None when it clashes
+    with a bullet added since the candidates were listed (nothing is changed then)."""
     if isinstance(candidate, BulletKey):
         section, eid, bid = candidate
         entry = sel.entry(section, eid)
+        if bank[section][eid].clash(bid, entry.bullet_ids()):
+            return None
         entry.bullets = [*(entry.bullets or []), bid]
         return f"{section}/{eid}/{bid}"
     pid = candidate

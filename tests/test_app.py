@@ -68,3 +68,88 @@ def test_budget_reached_stops_before_any_call(stub_llms, monkeypatch):
     called = []
     assert fallback.run_with_fallback("select", ["a:1"], lambda llm: called.append(1), {}, None) is None
     assert called == []
+
+
+# ---------- apply: resume and letter in the offer's language ----------
+
+import argparse
+
+from brain.app import apply as apply_mod
+from brain.app import letter as letter_mod
+from brain.offer.record import JobRecord
+
+FRENCH_OFFER = """Ingénieur IA (H/F) - Acme
+Nous recherchons un ingénieur IA pour rejoindre notre équipe à Lille. Vos missions :
+concevoir des agents LLM avec LangGraph, les évaluer et les mettre en production avec
+les équipes de test. Profil : Python, MCP, expérience des systèmes agentiques.
+"""
+ENGLISH_OFFER = """AI Engineer - Acme
+We are looking for an AI engineer to join our team in Lille. You will design LLM agents
+with LangGraph, evaluate them and ship them to production with the testing teams.
+Skills: Python, MCP, experience with agentic systems.
+"""
+
+
+@pytest.fixture
+def applying(tmp_path, monkeypatch):
+    """Runs `apply --no-ai` in a temp cv/company/, with LaTeX and the letter replaced by
+    recorders. Returns the calls: {"resume": [langs per build], "letter": [letter args]}."""
+    monkeypatch.setattr(paths, "COMPANIES", tmp_path / "company")
+    calls = {"resume": [], "letter": []}
+
+    def fake_build_all(bank, sel, out_dir, langs, **kw):
+        calls["resume"].append(list(langs))
+        return {lang: 1 for lang in langs}
+
+    def fake_letter(args):
+        calls["letter"].append(args)
+        return 0
+
+    monkeypatch.setattr(apply_mod, "build_all", fake_build_all)
+    monkeypatch.setattr(letter_mod, "cmd_letter", fake_letter)
+
+    def run(offer_text, **options):
+        offer_file = tmp_path / "offer.txt"
+        offer_file.write_text(offer_text, encoding="utf-8")
+        args = argparse.Namespace(company="Acme", offer=str(offer_file), paste=False,
+                                  url="https://example.com/job/1", force=True, model=None,
+                                  no_ai=True, no_fill=True, no_score=True, only=None, lang=None)
+        vars(args).update(options)
+        return apply_mod.cmd_apply(args), calls
+    return run
+
+
+def test_apply_makes_a_french_resume_and_letter_for_a_french_offer(applying):
+    status, calls = applying(FRENCH_OFFER)
+    assert status == 0
+    assert calls["resume"] and all(langs == ["fr"] for langs in calls["resume"])
+    assert [a.lang for a in calls["letter"]] == ["fr"]
+    folder = paths.COMPANIES / "acme"
+    assert JobRecord.load(folder / "job.json").language == "fr"
+    assert "languages:\n- fr" in (folder / "selection.yaml").read_text(encoding="utf-8")
+
+
+def test_apply_makes_english_documents_for_an_english_offer(applying):
+    status, calls = applying(ENGLISH_OFFER)
+    assert status == 0
+    assert all(langs == ["en"] for langs in calls["resume"])
+    assert [a.lang for a in calls["letter"]] == ["en"]
+
+
+def test_apply_lang_overrides_the_offer(applying):
+    _, calls = applying(FRENCH_OFFER, lang="en")
+    assert all(langs == ["en"] for langs in calls["resume"])
+    assert [a.lang for a in calls["letter"]] == ["en"]
+    assert JobRecord.load(paths.COMPANIES / "acme" / "job.json").language == "en"
+
+
+def test_apply_only_resume_skips_the_letter(applying):
+    _, calls = applying(FRENCH_OFFER, only="resume")
+    assert calls["resume"] and calls["letter"] == []
+
+
+def test_apply_only_letter_skips_the_resume(applying):
+    _, calls = applying(FRENCH_OFFER, only="letter")
+    assert calls["resume"] == []
+    assert [a.lang for a in calls["letter"]] == ["fr"]
+    assert (paths.COMPANIES / "acme" / "job.json").exists()

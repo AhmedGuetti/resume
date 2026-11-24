@@ -135,3 +135,41 @@ def test_extract_survives_malformed_answer(fake_llm):
     assert info["location"] is None
     assert info["skills_required"] == []
     assert sum("malformed" in n for n in notes) == 3
+
+
+# ---------- language ----------
+
+from brain.offer.parsing import guess_language, normalize_language
+
+
+@pytest.mark.parametrize("value, code", [
+    ("fr", "fr"), ("French", "fr"), ("fr-FR", "fr"), ("français", "fr"),
+    ("en", "en"), ("English", "en"), ("en-GB", "en"), ("anglais", "en"),
+    ("de", None), ("", None), (None, None),
+])
+def test_normalize_language(value, code):
+    assert normalize_language(value) == code
+
+
+@pytest.mark.parametrize("text, code", [
+    ("Nous recherchons un ingénieur IA pour rejoindre notre équipe. Vos missions : "
+     "concevoir des agents et les mettre en production avec les équipes métier.", "fr"),
+    ("We are looking for an AI engineer to join our team. You will design agents "
+     "and ship them to production with the business teams.", "en"),
+    ("", "en"),
+])
+def test_guess_language(text, code):
+    assert guess_language(text) == code
+
+
+def test_extract_always_sets_the_language_even_without_a_model():
+    info, _ = extract("Poste : ingénieur IA. Vous rejoindrez notre équipe à Lille pour "
+                      "développer des agents avec les équipes de test.", None)
+    assert info["language"] == "fr"
+
+
+def test_extract_normalizes_the_models_language(fake_llm):
+    offer = "We are hiring an AI engineer in Lille to build agents for the QA team."
+    llm = fake_llm({"facts": {"language": {"value": "English", "quote": ""}}, "lists": {}})
+    info, _ = extract(offer, llm)
+    assert info["language"] == "en"

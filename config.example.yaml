@@ -5,6 +5,8 @@
 models:
   extract: deepseek:deepseek-chat     # read the offer's facts
   select: deepseek:deepseek-chat      # pick the resume content
+  score: deepseek:deepseek-chat       # judge how well you fit the offer
+  letter: deepseek:deepseek-chat      # cover letter coach: style, starters, polish
   fallback: gemini:gemini-3.6-flash   # only when DeepSeek fails or answers badly
 
 # Spending limits in $ (estimates from brain/llm/pricing.yaml). When one is

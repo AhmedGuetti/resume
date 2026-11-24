@@ -1,12 +1,20 @@
 """Command line: python -m brain <command>
 
     python -m brain                                       # interactive shell (ninurta>)
-    python -m brain apply                                 # paste an offer; company etc. read from it
+    python -m brain apply                                 # paste an offer: resume + cover letter, in the offer's language
     python -m brain apply "Company X"                     # same, naming the company yourself
     python -m brain apply "Company X" --offer offer.txt   # ... or read it from a file
     python -m brain apply "Company X" --model deepseek:deepseek-chat   # pick the model
     python -m brain apply "Company X" --no-ai             # keyword matching only
+    python -m brain apply "Company X" --only resume       # just the resume (or --only letter)
+    python -m brain apply "Company X" --lang en           # both documents in English, whatever the offer's language
     python -m brain build SELECTION [--out DIR]           # PDFs from a selection file
+    python -m brain score company-x                       # fit score, competition, position
+    python -m brain letter company-x                      # cover letter from bank/letters/, fitted to the offer
+    python -m brain letter company-x --write              # ... or write it paragraph by paragraph, with a coach
+    python -m brain translate                             # French of the letter paragraphs whose English changed
+    python -m brain letter company-x --build              # rebuild it after editing letter.md
+    python -m brain voice                                 # how you write, for the letter coach
     python -m brain catalog [--json]                      # what's in the bank
     python -m brain usage                                 # what the LLM calls cost
 
@@ -26,6 +34,8 @@ from ..errors import LatexError
 from ..paths import show
 from ..render.pdf import build_all, pdf_path
 from .apply import cmd_apply
+from .letter import cmd_letter, cmd_translate, cmd_voice
+from .score import cmd_score
 
 
 def cmd_build(args) -> int:
@@ -39,7 +49,10 @@ def cmd_build(args) -> int:
     else:
         out_dir = sel_path.parent
     tex_out = Path(args.tex_dir).resolve() if args.tex_dir else None
-    pages = build_all(load_bank(), sel, out_dir, langs, pdf=not args.no_pdf, tex_out=tex_out)
+    bank = load_bank()
+    for clash in sel.clashes(bank):
+        print(f"WARN: {clash} say the same thing (see `conflicts:` in the bank): keep one", file=sys.stderr)
+    pages = build_all(bank, sel, out_dir, langs, pdf=not args.no_pdf, tex_out=tex_out)
     status = 0
     for lang, n in pages.items():
         if args.no_pdf:
@@ -92,7 +105,7 @@ def main(argv=None) -> int:
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest="cmd", required=True)
 
-    a = sub.add_parser("apply", help="tailored resume for a job offer, in cv/company/<name>/")
+    a = sub.add_parser("apply", help="tailored resume and cover letter for a job offer, in cv/company/<name>/")
     a.add_argument("company", nargs="?",
                    help="company name, e.g. \"Company X\" (default: read from the offer, or asked)")
     a.add_argument("--offer", help="text file with the job offer (saved as offer.md). "
@@ -105,6 +118,42 @@ def main(argv=None) -> int:
     a.add_argument("--no-ai", action="store_true", help="keyword matching only, even if a model is configured")
     a.add_argument("--no-fill", action="store_true",
                    help="only keep matching content, don't add more to fill the page")
+    a.add_argument("--no-score", action="store_true", help="skip the fit score and competition questions")
+    a.add_argument("--only", choices=["resume", "letter"],
+                   help="make just the resume or just the cover letter (default: both)")
+    a.add_argument("--lang", choices=LANGS,
+                   help="language of the resume and the letter (default: the offer's language)")
+
+    s = sub.add_parser("score", help="fit score, competition and position for an application")
+    s.add_argument("company", help="the application's folder name in cv/company/ (see `list`)")
+    s.add_argument("--model", help="LLM that judges the requirements (default: `models.score` in config.yaml)")
+    s.add_argument("--no-ai", action="store_true", help="judge the requirements by keyword matching")
+    s.add_argument("--no-ask", action="store_true", help="don't ask for the competition numbers")
+
+    lt = sub.add_parser("letter", help="write the cover letter for an application, paragraph by paragraph")
+    lt.add_argument("company", help="the application's folder name in cv/company/ (see `list`)")
+    lt.add_argument("--style", choices=["direct", "warm", "formal", "story"],
+                    help="skip the suggestion and use this style")
+    lt.add_argument("--lang", choices=LANGS, help="language of the letter (default: the offer's)")
+    lt.add_argument("--write", action="store_true",
+                    help="write it paragraph by paragraph with the coach, instead of assembling it from bank/letters/")
+    lt.add_argument("--no-adapt", action="store_true",
+                    help="use your bank/letters/ paragraphs as written (no linking sentence added by the AI)")
+    lt.add_argument("--skeleton", action="store_true",
+                    help="write letter.md with the guidance as comments, to fill in your editor")
+    lt.add_argument("--check", action="store_true", help="check letter.md against your rules")
+    lt.add_argument("--build", action="store_true", help="rebuild the PDF from letter.md (after editing it)")
+    lt.add_argument("--force", action="store_true", help="start over even if letter.md exists")
+    lt.add_argument("--model", help="LLM for the coach (default: `models.letter` in config.yaml)")
+    lt.add_argument("--no-ai", action="store_true", help="no model: built-in starters, keyword style suggestion")
+
+    sub.add_parser("voice", help="answer a few questions so the letter coach sounds like you")
+
+    tr = sub.add_parser("translate", help="translate bank/letters/ paragraphs whose English changed")
+    tr.add_argument("--dry-run", action="store_true", help="only list what is out of date")
+    tr.add_argument("--stamp", action="store_true",
+                    help="no AI: mark the French as up to date (after fixing it by hand)")
+    tr.add_argument("--model", help="LLM for the translation (default: `models.letter`)")
 
     b = sub.add_parser("build", help="generate .tex (and PDF) from a selection file")
     b.add_argument("selection")
@@ -120,7 +169,9 @@ def main(argv=None) -> int:
     c.add_argument("--json", action="store_true", help="full machine-readable dump")
 
     args = ap.parse_args(argv)
-    commands = {"apply": cmd_apply, "build": cmd_build, "catalog": cmd_catalog, "usage": cmd_usage}
+    commands = {"apply": cmd_apply, "build": cmd_build, "catalog": cmd_catalog, "usage": cmd_usage,
+                "score": cmd_score, "letter": cmd_letter, "voice": cmd_voice,
+                "translate": cmd_translate}
     try:
         return commands[args.cmd](args)
     except (BankError, KeyError) as e:
@@ -130,7 +181,7 @@ def main(argv=None) -> int:
         print(f"ERROR: {e}", file=sys.stderr)
         return 2
     except Exception as e:                       # LLM / network / API key problems
-        if args.cmd != "apply":
+        if args.cmd not in ("apply", "score"):
             raise
         print(f"ERROR: {type(e).__name__}: {e}", file=sys.stderr)
         print("Tip: --no-ai builds the resume with keyword matching instead.", file=sys.stderr)

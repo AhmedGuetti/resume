@@ -19,7 +19,7 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
-from ..bank import ENTRY_SECTIONS, EntryPick, Selection, usable, variant_base
+from ..bank import ENTRY_SECTIONS, EntryPick, Selection, usable
 from ..llm import LLM
 from ..llm.answers import lenient_list, parse_json
 from .keywords import select as keyword_select
@@ -42,6 +42,8 @@ then other useful ones; 4 to 8 items per group. Always keep every item of the \
 - Prefer concrete, measurable bullets that match the offer's stack and duties.
 - An id ending in "-short" is a compact variant of the same fact as the id without \
 it: never pick both.
+- Each entry may list "conflicts": groups of bullet ids that say the same thing. \
+Pick at most one bullet from each group.
 - "why": 2-3 sentences on what the offer wants and how the picks answer it.
 
 Answer with one JSON object only, no markdown:
@@ -62,7 +64,8 @@ def bank_for_prompt(bank: dict) -> str:
              "org": e.meta["org"]["en"] if isinstance(e.meta["org"], dict) else e.meta["org"],
              "title": e.meta["title"]["en"] if isinstance(e.meta["title"], dict) else e.meta["title"],
              "bullets": [{"id": b.id, "text": b.text["en"], "tags": b.tags}
-                         for b in e.bullets.values() if usable(b)]}
+                         for b in e.bullets.values() if usable(b)],
+             **({"conflicts": [sorted(g) for g in e.conflicts]} if e.conflicts else {})}
             for eid, e in bank[section].items()]
     data["skills"] = [{"id": gid, "label": g.label["en"], "items": [i["en"] for i in g.items]}
                       for gid, g in bank["skills"].items()]
@@ -113,18 +116,18 @@ def select(bank: dict, offer: str, default: Selection, llm: LLM) -> tuple[Select
         system, f"JOB OFFER:\n{offer.strip()}", json_output=True, task="select")))
 
     def checked_bullets(section: str, eid: str, wanted: list[str]) -> list[str]:
-        known = bank[section][eid].bullets
-        ok, bases = [], set()
-        for bid in wanted:
+        entry = bank[section][eid]
+        known = entry.bullets
+        ok = []
+        for bid in wanted:                     # the model lists the best first: the first one wins
             if bid not in known:
                 warnings.append(f"unknown bullet {section}/{eid}/{bid}")
             elif not usable(known[bid]):
                 warnings.append(f"skipped {section}/{eid}/{bid}: tagged to-confirm")
-            elif variant_base(bid) in bases:
-                warnings.append(f"skipped {section}/{eid}/{bid}: its other variant is already picked")
+            elif other := entry.clash(bid, ok):
+                warnings.append(f"skipped {section}/{eid}/{bid}: says the same as {other}, already picked")
             else:
                 ok.append(bid)
-                bases.add(variant_base(bid))
         return ok
 
     def model_entries(section: str) -> dict[str, list[str]]:

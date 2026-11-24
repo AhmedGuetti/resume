@@ -6,6 +6,13 @@ title:
 location: Toulouse, France
 end: 2026-09
 tags: [ai, ml, computer-graphics, computer-vision, research]
+conflicts:                # at most one bullet of each group on a resume (enforced)
+  - [tir-paper, tir-paper-short]
+  - [coursework, coursework-ml]
+  - [course-projects, reid, reid-full]
+  - [course-projects, renderer, renderer-full]
+  - [course-projects, skinning, renderer-full]
+  - [reussite-pitch, reussite-lead]
 ---
 
 <!--
@@ -15,13 +22,11 @@ Conventions:
   - tag "to-confirm" = taken from an older resume version (resume.pdf / resumeFR.pdf),
     not yet re-confirmed. Do not ship until confirmed.
   - The title already shows the rank: use the `rank` bullet only if the rank is removed from the title.
-Conflicts (pick at most ONE per line):
-  - tir-paper | tir-paper-short
-  - coursework | coursework-ml
-  - course-projects | reid      (course-projects already summarises reid, renderer and skinning)
-  - course-projects | renderer | renderer-full
-  - course-projects | skinning | renderer-full
-  - pnp-flow | ultrasound-dps   (until we know whether they are one project or two)
+Conflicts: see `conflicts:` in the front matter (checked by the code).
+Sources: course reports in doc/ut3/ (rendering, skinning, re-ID, mesh geometry, PnP-Flow, DPS)
+and the Réussite project plan in doc/ISIS-Champellion/Project Reussit/. The dates printed on
+some PDFs are the export date, not the work date: don't use them.
+PnP-Flow and DPS are two separate projects (computational imaging course; TSAI course).
 Open questions are at the bottom of the file.
 -->
 
@@ -73,30 +78,52 @@ tags: computer-vision, python, metric-learning
 en: Person re-identification in Python: LOMO features with XQDA metric learning.
 fr: Ré-identification de personnes en Python : descripteurs LOMO et apprentissage de métrique XQDA.
 
+## reid-full
+tags: computer-vision, python, metric-learning, numpy, linear-algebra, research, reproduction
+en: Reimplemented a CVPR 2015 person re-identification method in Python with a classmate (LOMO features + XQDA metric learning), using a truncated-SVD PCA to fit the 27,000-dimension covariance matrices in memory; evaluated it on surveillance footage (Rank-5 above 75%).
+fr: Réimplémentation en Python, en binôme, d'une méthode de ré-identification de personnes de CVPR 2015 (descripteurs LOMO + apprentissage de métrique XQDA), avec une ACP par SVD tronquée pour tenir en mémoire des matrices de covariance de 27 000 dimensions ; évaluation sur des vidéos de surveillance (Rank-5 supérieur à 75 %).
+
 ## renderer
 tags: computer-graphics, rendering, opengl, glsl, c++, gpu
 en: Real-time glTF renderer in C++/OpenGL: physically based shading (Cook–Torrance) and shadow mapping with PCF soft shadows.
 fr: Moteur de rendu glTF temps réel en C++/OpenGL : rendu physique (Cook–Torrance) et ombres portées avec filtrage PCF.
 
 ## renderer-full
-tags: computer-graphics, rendering, opengl, glsl, c++, gpu, animation, to-confirm
-en: 3D rendering engine (C++, OpenGL, GLSL): PBR and Phong shading, shadow mapping, HDR, glTF loading, free camera, skeletal animation (LBS, dual quaternion skinning) on CPU and GPU.
-fr: Moteur de rendu 3D temps réel (C++, OpenGL, GLSL) : rendu PBR et Phong, ombres portées, HDR, chargement glTF, caméra libre, animation squelettique (LBS, Dual Quaternion Skinning) sur CPU et GPU.
+tags: computer-graphics, rendering, opengl, glsl, c++, gpu, animation
+en: 3D rendering engine (C++, OpenGL, GLSL): glTF 2.0 PBR (Cook–Torrance with GGX, Fresnel-Schlick and Smith terms, Reinhard tone mapping), two-pass shadow mapping with 3×3 PCF, FPS camera, Bézier surfaces, and linear blend skinning on CPU and GPU.
+fr: Moteur de rendu 3D temps réel (C++, OpenGL, GLSL) : PBR glTF 2.0 (Cook–Torrance avec termes GGX, Fresnel-Schlick et Smith, tone mapping de Reinhard), shadow mapping en deux passes avec PCF 3×3, caméra FPS, surfaces de Bézier, et linear blend skinning sur CPU et GPU.
 
 ## skinning
-tags: computer-graphics, animation, gpu, c++, performance
-en: Skeletal animation and skinning: implemented linear blend skinning on CPU and GPU and compared the two.
-fr: Animation squelettique et skinning : implémentation du linear blend skinning sur CPU et GPU, avec comparaison des deux.
+tags: computer-graphics, animation, gpu, c++, glsl
+en: Skeletal animation and skinning: implemented linear blend skinning on the CPU, then ported it to a GLSL vertex shader, with a live switch between the two producing identical results.
+fr: Animation squelettique et skinning : implémentation du linear blend skinning sur CPU, puis portage dans un vertex shader GLSL, avec bascule en direct entre les deux pour un résultat identique.
+
+## mesh-geometry
+tags: computer-graphics, geometry, c++, eigen, linear-algebra, data-structures, 3d
+en: Mesh processing in C++: a half-edge data structure, explicit and implicit Laplacian smoothing (sparse solves with Eigen), curvature visualisation and interactive vertex editing (Polyscope, ImGui).
+fr: Traitement de maillages en C++ : structure de données half-edge, lissage laplacien explicite et implicite (systèmes creux résolus avec Eigen), visualisation de la courbure et édition interactive des sommets (Polyscope, ImGui).
 
 ## pnp-flow
-tags: research, deep-learning, generative-models, medical-imaging, python, to-confirm
-en: Image restoration (PnP-Flow): reproduced an ICLR 2025 paper combining Plug-and-Play methods with Flow Matching, extended it to ultrasound, and analysed the distribution shift between training and medical data (PSNR).
-fr: Restauration d'images (PnP-Flow) : reproduction d'un article ICLR 2025 combinant méthodes Plug-and-Play et Flow Matching, extension à l'échographie et analyse du décalage de distribution entre données d'entraînement et données médicales (PSNR).
+tags: research, deep-learning, generative-models, medical-imaging, python, reproduction
+en: Image restoration (PnP-Flow): reproduced an ICLR 2025 paper combining Plug-and-Play methods with Flow Matching (best PSNR on 4 of 5 restoration tasks, as reported), then applied it to ultrasound and showed that the face-trained prior hallucinates out of distribution.
+fr: Restauration d'images (PnP-Flow) : reproduction d'un article ICLR 2025 combinant méthodes Plug-and-Play et Flow Matching (meilleur PSNR sur 4 des 5 tâches de restauration, comme annoncé), puis application à l'échographie, montrant que le prior entraîné sur des visages hallucine hors distribution.
 
 ## ultrasound-dps
-tags: deep-learning, diffusion-models, medical-imaging, python, to-confirm
-en: Ultrasound reconstruction with Diffusion Posterior Sampling, evaluated on simulated and in vivo data (PSNR, SSIM, CNR).
-fr: Reconstruction d'images échographiques par Diffusion Posterior Sampling, évaluée sur données simulées et in vivo (PSNR, SSIM, CNR).
+tags: deep-learning, diffusion-models, medical-imaging, python, reproduction
+en: Diffusion Posterior Sampling: reproduced six inverse problems from the paper (inpainting, super-resolution, deblurring, phase retrieval), then applied it to ultrasound deconvolution with a known PSF, evaluated on simulated and in vivo data (PSNR, SSIM, CNR).
+fr: Diffusion Posterior Sampling : reproduction de six problèmes inverses de l'article (inpainting, super-résolution, défloutage, récupération de phase), puis application à la déconvolution échographique avec PSF connue, évaluée sur données simulées et in vivo (PSNR, SSIM, CNR).
+
+<!-- ======================= PROJECT MANAGEMENT ======================= -->
+
+## reussite-pitch
+tags: project-management, agile, teamwork, web, javascript
+en: **Réussite (project-management course):** improved a serious game that teaches first-year students to organise their time, for INU Champollion as the client: UI bug fixes, an interactive calendar (FullCalendar) and Moodle integration (LTI).
+fr: **Réussite (module de gestion de projet) :** amélioration d'un jeu sérieux qui apprend aux étudiants de première année à organiser leur temps, pour l'INU Champollion comme client : correction de bugs d'interface, calendrier interactif (FullCalendar) et intégration Moodle (LTI).
+
+## reussite-lead
+tags: project-management, leadership, agile, scrum, jira, gitlab, teamwork, client
+en: Project lead of a 4-student team for a real client (INU Champollion): ran nine weekly sprints in Jira, a weekly client review, and a decision log, from kick-off to final defence.
+fr: Chef de projet d'une équipe de 4 étudiants pour un client réel (INU Champollion) : neuf sprints hebdomadaires sur Jira, une revue client chaque semaine et un registre des décisions, du lancement à la soutenance.
 
 ## k8s-anomaly
 tags: mlops, streaming, kafka, spark, kubernetes, monitoring, to-confirm
@@ -111,10 +138,11 @@ fr: Systèmes répartis (C, Java RMI) : implémentation de l'exclusion mutuelle 
 <!--
 OPEN QUESTIONS
 1. Start date: M1 at UT3 from 2024-09? (gives a "2024 – 2026" range)
-2. Renderer: older resume lists Phong, HDR, free camera and DQS beyond the confirmed
-   Cook–Torrance + PCF. Were all of these done?
-3. PnP-Flow and ultrasound DPS: one project or two? Solo or team?
+2. (answered by the reports: no DQS, no SSAO, no textures; FPS camera yes)
+3. (answered: two projects. PnP-Flow report is solo; DPS report has no author list)
 4. Anomaly detection, Lamport/Grid'5000, coursework-ml list: still accurate?
 5. Was the ISIS Champollion internship (Apr–Jul 2025) the M1's required internship?
    If so, it can be linked here.
+6. Réussite: which parts did Ahmed build himself (calendar? LTI? AI coach?)
+7. Signal processing / beamforming course: no report in doc/, so no bullet yet.
 -->

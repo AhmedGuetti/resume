@@ -15,6 +15,8 @@ from pathlib import Path
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
 
 from ..errors import explain
+from ..score.competition import Position, Snapshot
+from ..score.fit import FitScore
 from .parsing import parse_applicants, parse_posted, parse_salary
 
 
@@ -88,6 +90,9 @@ class JobRecord(_Open):
     benefits: list[str] = Field(default_factory=list)
     meta: Meta = Field(default_factory=Meta)
     application: Application = Field(default_factory=Application)
+    fit: FitScore | None = None                              # how well you match (score/)
+    competition: list[Snapshot] = Field(default_factory=list)   # applicants over time, oldest first
+    position: Position | None = None                         # verdict from fit + latest snapshot
 
     @field_validator("experience_years", "education", "start_date", "duration", "seniority",
                      mode="before")

@@ -8,15 +8,17 @@ from pathlib import Path
 import yaml
 
 from ..errors import BankError
-from ..paths import BANK, ROOT
+from ..paths import BANK, ROOT, show
 
 LANGS = ("en", "fr")
 SECTION_DIRS = {"education": "education", "experience": "experiences", "projects": "projects"}
 
 
-# Bank conventions (see the comment at the top of an experience file):
-#   tag "to-confirm"  not verified yet: never put on a resume
-#   id "<x>-short"    compact variant of bullet <x>: never both on one resume
+# Bank conventions:
+#   tag "to-confirm"      not verified yet: never put on a resume
+#   id "<x>-short"        compact variant of bullet <x>: never both on one resume
+#   front matter          conflicts: [[a, b], [c, d, e]]  -> at most one bullet of each
+#                         group on one resume (they say the same thing)
 def usable(bullet) -> bool:
     return "to-confirm" not in bullet.tags
 
@@ -38,6 +40,25 @@ class Entry:
     kind: str
     meta: dict
     bullets: dict[str, Bullet]
+    conflicts: list[frozenset[str]] = field(default_factory=list)   # from the front matter
+
+    def clash(self, bid: str, chosen) -> str | None:
+        """The bullet of `chosen` that `bid` may not sit next to, or None.
+        Two bullets clash when one is the other's -short variant, or when a
+        `conflicts:` group of the front matter holds both."""
+        for other in chosen:
+            if other == bid:
+                continue
+            if variant_base(other) == variant_base(bid):
+                return other
+            if any(bid in group and other in group for group in self.conflicts):
+                return other
+        return None
+
+    def clashes(self, bullet_ids) -> list[tuple[str, str]]:
+        """Every pair of bullets in `bullet_ids` that may not be on the same resume."""
+        ids = list(bullet_ids)
+        return [(a, b) for i, a in enumerate(ids) for b in ids[i + 1:] if self.clash(a, [b])]
 
 
 @dataclass
@@ -106,7 +127,28 @@ def load_entry(path: Path, kind: str) -> Entry:
             raise BankError(f"{path.relative_to(ROOT)}: duplicate bullet id '{bid}'")
         tags = [t.strip() for t in fields.get("tags", "").split(",") if t.strip()]
         bullets[bid] = Bullet(bid, {lang: fields[lang] for lang in LANGS}, tags)
-    return Entry(path.stem, kind, meta, bullets)
+    conflicts = read_conflicts(meta.pop("conflicts", None), bullets, path)
+    return Entry(path.stem, kind, meta, bullets, conflicts)
+
+
+def read_conflicts(value, bullets: dict, path: Path) -> list[frozenset[str]]:
+    """`conflicts:` in the front matter: a list of groups, each a list of bullet ids
+    (or one string "a | b | c"). Every id must exist in the file."""
+    where = show(path)
+    if value is None:
+        return []
+    if not isinstance(value, list):
+        raise BankError(f"{where}: `conflicts:` must be a list of groups, like [[a, b], [c, d]]")
+    groups = []
+    for group in value:
+        ids = [i.strip() for i in group.split("|")] if isinstance(group, str) else group
+        if not isinstance(ids, list) or len(ids) < 2 or not all(isinstance(i, str) for i in ids):
+            raise BankError(f"{where}: conflict group {group!r} needs two or more bullet ids")
+        unknown = [i for i in ids if i not in bullets]
+        if unknown:
+            raise BankError(f"{where}: conflict group {group!r} names unknown bullet(s): {', '.join(unknown)}")
+        groups.append(frozenset(ids))
+    return groups
 
 
 def load_skills(path: Path) -> dict[str, SkillGroup]:

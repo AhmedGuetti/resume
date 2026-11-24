@@ -42,11 +42,12 @@ check: text
 	@for l in $(LANGS); do p=$$(pdfinfo $(PDFDIR)/resume-$$l.pdf | awk '/^Pages/{print $$2}'); \
 	  if [ "$$p" -gt 1 ]; then echo "WARN: resume-$$l is $$p pages"; fi; done
 
-# Tailored resume for a job offer:  make apply COMPANY="Company X" OFFER=offer.txt
-# -> cv/company/company-x/pdf/resume-{en,fr}.pdf (LaTeX sources in .../tex/)
+# Tailored resume + cover letter for a job offer, in the offer's language:
+#   make apply COMPANY="Company X" OFFER=offer.txt
+# -> cv/company/company-x/pdf/resume-<lang>.pdf and letter-<lang>.pdf (LaTeX sources in .../tex/)
 apply:
-	@test -n "$(COMPANY)" || { echo 'usage: make apply COMPANY="Company X" [OFFER=offer.txt] [MODEL=provider:model] [NOAI=1]'; exit 1; }
-	python3 -m brain apply "$(COMPANY)" $(if $(OFFER),--offer "$(OFFER)") $(if $(MODEL),--model "$(MODEL)") $(if $(NOAI),--no-ai)
+	@test -n "$(COMPANY)" || { echo 'usage: make apply COMPANY="Company X" [OFFER=offer.txt] [MODEL=provider:model] [NOAI=1] [ONLY=resume|letter] [LANG_=en|fr]'; exit 1; }
+	python3 -m brain apply "$(COMPANY)" $(if $(OFFER),--offer "$(OFFER)") $(if $(MODEL),--model "$(MODEL)") $(if $(NOAI),--no-ai) $(if $(ONLY),--only $(ONLY)) $(if $(filter command line,$(origin LANG_)),--lang $(LANG_))
 
 # Rebuild after hand-editing a selection:  make tailor SEL=cv/company/company-x/selection.yaml
 tailor:
