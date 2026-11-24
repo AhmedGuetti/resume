@@ -75,6 +75,7 @@ Tips:
 - **Use tags.** Without AI, tags are how bullets get matched to an offer.
 - **Tag `to-confirm`** on anything you haven't double-checked. It will never go on a resume.
 - **Name a shorter version `<id>-short`** (e.g. `churn-model-short`). The tool never puts both versions on the same page.
+- **Group bullets that overlap** under `conflicts:` in the file's front matter (e.g. `- [overview, overview-short-intro]`). At most one of each group goes on a resume.
 
 Then list what you want on the general resume in `bank/selections/default.yaml`
 (entries by file name, bullets by `## id`), and rebuild.
@@ -209,17 +210,22 @@ through each paragraph with questions and ways to start. How to write each part 
 
 | Command | What it does |
 |---|---|
-| `apply` | paste an offer, get a tailored resume |
+| `apply` | paste an offer, get a tailored resume and cover letter in the offer's language |
+| `apply --only resume` | just the resume (`--only letter`: just the letter; `--lang en` forces English) |
 | `list` | all your applications, newest first, with fit score and verdict |
 | `show acme` | the facts saved from that offer, and the score |
 | `score acme` | update the applicant numbers and re-score |
-| `open acme [fr]` | open the PDF |
+| `open acme [fr] [letter]` | open the resume PDF, or the letter |
 | `letter acme` | the cover letter, assembled from your `bank/letters/` paragraphs |
+| `resume acme` | redo just the tailored resume from the saved offer (`--lang en` for the other language) |
+| `edit acme [letter\|selection\|offer]` | open that file in your editor; `edit bank/letters/general.md` for any file |
 | `letter acme --write` | write it paragraph by paragraph instead, with a coach |
 | `translate` | redo the French of the paragraphs whose English you changed |
 | `letter acme --build` | rebuild the letter after editing `letter.md` |
 | `voice` | answer a few questions so the coach sounds like you |
 | `build acme` | rebuild after editing `selection.yaml` |
+| `main` / `main check` | rebuild your main resume `pdf/resume-*.pdf` (like `make` / `make check`) |
+| `!git status` | run any system command without leaving the shell |
 | `catalog` | every entry, bullet id and skill in your bank |
 | `model off` | no AI for this session (`model config` to undo) |
 | `cost` / `usage` | what the AI cost this session / today / this month |

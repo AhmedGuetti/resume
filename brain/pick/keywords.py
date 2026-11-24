@@ -15,7 +15,7 @@ from __future__ import annotations
 import re
 from functools import lru_cache
 
-from ..bank import Bullet, Entry, EntryPick, Selection, SkillPick, usable, variant_base
+from ..bank import Bullet, Entry, EntryPick, Selection, SkillPick, usable
 from .report import BulletKey, MatchReport
 
 # Words an offer may use for a bank keyword. Keys are bank keywords (lowercase).
@@ -95,11 +95,10 @@ def pick_bullets(entry: Entry, found: set[str]) -> list[tuple[str, int]]:
     """Best bullets first; always at least one so the entry isn't empty."""
     scored = [(bid, score_bullet(b, found)) for bid, b in entry.bullets.items() if usable(b)]
     ranked = sorted(scored, key=lambda s: -s[1])          # stable: ties keep file order
-    keep, bases = [], set()
-    for bid, score in ranked:                             # never a bullet and its -short twin
-        if score > 0 and variant_base(bid) not in bases and len(keep) < MAX_BULLETS_PER_ENTRY:
+    keep = []
+    for bid, score in ranked:                 # never two bullets that clash (-short twin, conflicts:)
+        if score > 0 and len(keep) < MAX_BULLETS_PER_ENTRY and not entry.clash(bid, [k for k, _ in keep]):
             keep.append((bid, score))
-            bases.add(variant_base(bid))
     return keep or ranked[:1]
 
 

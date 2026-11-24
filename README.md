@@ -93,22 +93,37 @@ ninurta> help
 ```
 
 Up/down arrows recall earlier commands and Tab completes command and company names.
+The shell covers the whole workflow, so you never have to leave it: `apply`, `resume`
+and `letter` for an application, `edit acme letter` to open a file in your editor, `build`
+to rebuild after editing, `main` to rebuild your main resume (like `make`), `open`, `list`,
+and `!command` for anything else (`!git status`). Tab completes commands, company names,
+`--flags` and their values (`--only `, `--lang `). `help` lists everything.
+
 Everything also works as a one-off command, e.g. `make apply COMPANY="Company X" OFFER=offer.txt`
 or `python -m brain apply "Company X"` (which asks you to paste the offer).
 
-`apply` creates `cv/company/<company>/` with:
+`apply` makes both documents, in the language of the offer: a French offer gets a French
+resume and a French cover letter, an English offer English ones. The language comes from
+the offer (read by the model, or guessed from its words without AI); `--lang en|fr` forces
+it. `--only resume` or `--only letter` makes just one of the two; `letter <company>` makes
+or redoes the letter later.
+
+It creates `cv/company/<company>/` with (for a French offer):
 
 ```
 offer.md          the offer text
-job.json          the facts of the offer (see below)
+job.json          the facts of the offer (see below), including its language
 selection.yaml    what was picked, the keywords that matched, and what was added or dropped
+letter.md         the cover letter, each paragraph's source in a comment, to edit
 pdf/
-  resume-en.pdf   tailored resume, English
-  resume-fr.pdf   tailored resume, French
+  resume-fr.pdf   tailored resume
+  letter-fr.pdf   cover letter
 tex/
-  resume-en.tex   the LaTeX they were built from (LaTeX's temporary files go in tex/.build/)
-  resume-fr.tex
+  resume-fr.tex   the LaTeX it was built from (LaTeX's temporary files go in tex/.build/)
 ```
+
+The other language is one command away: `build <company> --lang en` for the resume,
+`letter <company> --lang en` for the letter.
 
 **The facts of the offer (`job.json`).** The LLM reads the company, job title, location,
 work mode, contract, seniority, experience and degree asked, salary, posting date,
@@ -137,7 +152,8 @@ if that name is taken, so an earlier application is never overwritten.
 **Who picks the content.** An LLM reads the offer and the bank and chooses which bullets,
 projects and skills to use, most relevant first. It only chooses: it never writes resume
 text, and any id it makes up is dropped (and reported). Bullets tagged `to-confirm` are
-never shown to it, and a bullet and its `-short` variant never end up on the same page.
+never shown to it, and a bullet and its `-short` variant never end up on the same page, nor
+two bullets of a `conflicts:` group (declared in the bank file's front matter).
 Without a model, or with `--no-ai`, plain keyword matching does the job: it looks for the
 bank's tags and skill names in the offer, with a few English/French synonyms.
 

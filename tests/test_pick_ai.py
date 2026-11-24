@@ -10,8 +10,11 @@ OFFER = "ML Engineer: LLM agents, Python, testing, CI/CD."
 def _pick(bank, section, n=1):
     """(entry id, [usable bullet ids]) from the real bank, so tests follow bank edits."""
     eid, entry = next(iter(bank[section].items()))
-    ok = [b for b, bullet in entry.bullets.items() if usable(bullet) and not b.endswith("-short")]
-    return eid, ok[:n]
+    ok = []
+    for b, bullet in entry.bullets.items():          # usable, and no two that clash
+        if usable(bullet) and not entry.clash(b, ok) and len(ok) < n:
+            ok.append(b)
+    return eid, ok
 
 
 def _entry_with(bank, predicate):
@@ -99,7 +102,7 @@ def test_unconfirmed_and_twin_bullets_are_refused(bank, default_sel, fake_llm):
     twin_pick = picked.get((section2, eid2), [])
     assert not (short in twin_pick and short[:-6] in twin_pick)
     w = "\n".join(report.warnings)
-    assert "to-confirm" in w and "other variant" in w
+    assert "to-confirm" in w and "says the same as" in w
 
 
 def test_model_picks_outrank_keyword_scores(bank, default_sel, fake_llm):
@@ -117,3 +120,20 @@ def test_bank_is_in_system_prompt_and_offer_in_user(bank, default_sel, fake_llm)
     call = llm.calls[0]
     assert "CONTENT BANK" in call["system"] and OFFER not in call["system"]
     assert OFFER in call["user"] and call["task"] == "select"
+
+
+def test_conflicting_bullets_from_the_model_keep_the_first(bank, default_sel, fake_llm):
+    """A `conflicts:` group in the front matter: the model's first pick wins, the other is refused."""
+    eid, entry = next((eid, e) for eid, e in bank["experience"].items() if e.conflicts)
+    group = sorted(next(iter(entry.conflicts)))
+    llm = fake_llm({"experience": [{"id": eid, "bullets": group}],
+                    "education": [], "projects": [], "skills": [], "why": ""})
+    sel, report = select(bank, OFFER, default_sel, llm)
+    assert sel.entry("experience", eid).bullet_ids() == group[:1]
+    assert any("says the same as" in w and group[1] in w for w in report.warnings)
+
+
+def test_conflicts_are_shown_to_the_model(bank, default_sel, fake_llm):
+    llm = fake_llm({"why": ""})
+    select(bank, OFFER, default_sel, llm)
+    assert '"conflicts"' in llm.calls[0]["system"] and "at most one bullet from each group" in llm.calls[0]["system"]

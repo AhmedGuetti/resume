@@ -1,4 +1,5 @@
-"""`apply`: from a job offer to a tailored one-page resume in cv/company/<name>/.
+"""`apply`: from a job offer to a tailored one-page resume and a cover letter in cv/company/<name>/,
+both in the offer's language (a French offer gets a French resume and letter).
 
 The steps, in order (each one is a function below):
 
@@ -7,10 +8,14 @@ The steps, in order (each one is a function below):
     3. read_facts           company, title, salary, date, ... -> job.json (offer/)
     4. check_repost         same company and same job title as an earlier application?
     5. save_application     cv/company/<name>/ with offer.md and job.json
+       offer_language       the language of both documents: --lang, else the offer's
     6. pick_content         the LLM (or keyword matching) chooses what goes on the page (pick/)
     7. fit_one_page         drop the weakest bullets, or add the next best, until it fills one page
     8. write_selection      selection.yaml: what was picked and why, to edit and rebuild by hand
     9. score_application    fit score, competition (asked to you) and position -> job.json (app/score.py)
+   10. make_letter          the cover letter, assembled from bank/letters/ (app/letter.py)
+
+--only resume / --only letter makes just one of the two (steps 6-9 or step 10).
 
 A step that has to stop the run raises Stop with the exit code.
 """
@@ -31,7 +36,7 @@ from ..llm import LLM
 from ..llm.fallback import model_chain, run_with_fallback
 from ..offer import dedup
 from ..offer.facts import extract
-from ..offer.parsing import guess_source
+from ..offer.parsing import guess_language, guess_source
 from ..offer.record import JobRecord, to_record
 from ..paths import show
 from ..pick.fit import add, fill_candidates, shrink, undo
@@ -97,6 +102,8 @@ def unique_folder(slug: str) -> Path:
 
 def cmd_apply(args) -> int:
     run = Run(args)
+    only = getattr(args, "only", None)
+    status = 0
     try:
         offer = get_offer(args)
         if offer.is_new:
@@ -106,27 +113,71 @@ def cmd_apply(args) -> int:
             record = read_facts(run, offer)
             check_repost(record, offer, args)
         folder = save_application(offer, record, args)
+        lang = offer_language(record, offer.text, getattr(args, "lang", None))
+        record.save(folder / "job.json")
 
-        bank = load_bank()
-        sel, report = pick_content(run, bank, offer.text, folder)
-        pages, dropped, added = fit_one_page(bank, sel, report, folder, args.no_fill)
-        write_selection(folder, sel, report, record, run.used(), dropped, added)
-        if not args.no_score:
-            score_application(bank, record, sel, run.chain("score"), run.llms, label=folder.name)
-            record.save(folder / "job.json")
-            print_score(record)
+        if only != "letter":
+            status = make_resume(run, record, offer.text, folder, lang)
     except Stop as stop:
         if str(stop):
             print(str(stop), file=sys.stderr if stop.code == EXIT_BAD_INPUT else sys.stdout)
         return stop.code
 
+    if only != "resume":
+        status = max(status, make_letter(folder, lang, args))
+    return status
+
+
+# ---------- the language of both documents ----------
+
+LANGUAGE_NAME = {"en": "English", "fr": "French"}
+
+
+def offer_language(record: JobRecord, offer: str, forced: str | None = None) -> str:
+    """--lang if given, else the language read from the offer, else a guess from its words.
+    Stored in job.json, so `letter` and `score` use the same one later."""
+    if forced:
+        lang, why = forced, "--lang"
+    elif record.language in LANGS:
+        lang, why = record.language, "the offer is written in it"
+    else:
+        lang, why = guess_language(offer), "guessed from the offer's words"
+    record.language = lang
+    print(f"Language: {LANGUAGE_NAME[lang]} ({why}). --lang en|fr changes it.")
+    return lang
+
+
+def make_resume(run: Run, record: JobRecord, offer: str, folder: Path, lang: str) -> int:
+    """Steps 6-9: the one-page resume in `lang`, then the fit score."""
+    bank = load_bank()
+    sel, report = pick_content(run, bank, offer, folder)
+    sel.languages = [lang]                     # `build selection.yaml` rebuilds the same language
+    pages, dropped, added = fit_one_page(bank, sel, report, folder, run.args.no_fill, [lang])
+    write_selection(folder, sel, report, record, run.used(), dropped, added)
+    if not run.args.no_score:
+        score_application(bank, record, sel, run.chain("score"), run.llms, label=folder.name)
+        record.save(folder / "job.json")
+        print_score(record)
+
     for llm in run.used():
         print(f"   {llm.usage_line()}")
-    for lang in LANGS:
-        print(f"-> {show(pdf_path(folder, lang))} ({pages[lang]} page{'s' if pages[lang] > 1 else ''})")
+    n = pages[lang]
+    print(f"-> {show(pdf_path(folder, lang))} ({n} page{'s' if n > 1 else ''})")
     print(f"-> {show(folder / 'selection.yaml')} (what was picked, and why)")
     print(f"-> {show(folder / 'job.json')} (facts from the offer, fit score, competition)")
-    return EXIT_TOO_LONG if max(pages.values()) > 1 else 0
+    return EXIT_TOO_LONG if n > 1 else 0
+
+
+def make_letter(folder: Path, lang: str, args) -> int:
+    """Step 10: the cover letter, in the same language as the resume."""
+    import argparse
+    from .letter import RULE, cmd_letter
+    print(RULE)
+    print(f"Cover letter ({LANGUAGE_NAME[lang]})")
+    letter_args = argparse.Namespace(
+        company=folder.name, style=None, lang=lang, write=False, no_adapt=False, skeleton=False,
+        check=False, build=False, force=False, model=args.model, no_ai=args.no_ai)
+    return cmd_letter(letter_args)
 
 
 # ---------- 1-5: the offer and job.json ----------
@@ -250,13 +301,13 @@ def pick_content(run: Run, bank: dict, offer: str, folder: Path) -> tuple[Select
 
 
 def fit_one_page(bank: dict, sel: Selection, report: MatchReport, folder: Path,
-                 no_fill: bool) -> tuple[dict[str, int], list[str], list[str]]:
+                 no_fill: bool, langs=LANGS) -> tuple[dict[str, int], list[str], list[str]]:
     """Builds the PDFs until they fill exactly one page. Returns (pages, dropped, added)."""
     pages: dict[str, int] = {}
 
     def fits() -> bool:
         nonlocal pages
-        pages = build_all(bank, sel, folder, LANGS)
+        pages = build_all(bank, sel, folder, langs)
         return max(pages.values()) <= 1
 
     # Too long? Drop the weakest bullets until it fits.
@@ -273,6 +324,8 @@ def fit_one_page(bank: dict, sel: Selection, report: MatchReport, folder: Path,
     if not dropped and not no_fill:
         for candidate in fill_candidates(bank, sel, report):
             label = add(sel, bank, report, candidate)
+            if label is None:                     # says the same as a bullet just added
+                continue
             print(f"   trying {label} ...", end=" ", flush=True)
             if fits():
                 print("fits")

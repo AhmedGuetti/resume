@@ -1,11 +1,13 @@
 """Command line: python -m brain <command>
 
     python -m brain                                       # interactive shell (ninurta>)
-    python -m brain apply                                 # paste an offer; company etc. read from it
+    python -m brain apply                                 # paste an offer: resume + cover letter, in the offer's language
     python -m brain apply "Company X"                     # same, naming the company yourself
     python -m brain apply "Company X" --offer offer.txt   # ... or read it from a file
     python -m brain apply "Company X" --model deepseek:deepseek-chat   # pick the model
     python -m brain apply "Company X" --no-ai             # keyword matching only
+    python -m brain apply "Company X" --only resume       # just the resume (or --only letter)
+    python -m brain apply "Company X" --lang en           # both documents in English, whatever the offer's language
     python -m brain build SELECTION [--out DIR]           # PDFs from a selection file
     python -m brain score company-x                       # fit score, competition, position
     python -m brain letter company-x                      # cover letter from bank/letters/, fitted to the offer
@@ -47,7 +49,10 @@ def cmd_build(args) -> int:
     else:
         out_dir = sel_path.parent
     tex_out = Path(args.tex_dir).resolve() if args.tex_dir else None
-    pages = build_all(load_bank(), sel, out_dir, langs, pdf=not args.no_pdf, tex_out=tex_out)
+    bank = load_bank()
+    for clash in sel.clashes(bank):
+        print(f"WARN: {clash} say the same thing (see `conflicts:` in the bank): keep one", file=sys.stderr)
+    pages = build_all(bank, sel, out_dir, langs, pdf=not args.no_pdf, tex_out=tex_out)
     status = 0
     for lang, n in pages.items():
         if args.no_pdf:
@@ -100,7 +105,7 @@ def main(argv=None) -> int:
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest="cmd", required=True)
 
-    a = sub.add_parser("apply", help="tailored resume for a job offer, in cv/company/<name>/")
+    a = sub.add_parser("apply", help="tailored resume and cover letter for a job offer, in cv/company/<name>/")
     a.add_argument("company", nargs="?",
                    help="company name, e.g. \"Company X\" (default: read from the offer, or asked)")
     a.add_argument("--offer", help="text file with the job offer (saved as offer.md). "
@@ -114,6 +119,10 @@ def main(argv=None) -> int:
     a.add_argument("--no-fill", action="store_true",
                    help="only keep matching content, don't add more to fill the page")
     a.add_argument("--no-score", action="store_true", help="skip the fit score and competition questions")
+    a.add_argument("--only", choices=["resume", "letter"],
+                   help="make just the resume or just the cover letter (default: both)")
+    a.add_argument("--lang", choices=LANGS,
+                   help="language of the resume and the letter (default: the offer's language)")
 
     s = sub.add_parser("score", help="fit score, competition and position for an application")
     s.add_argument("company", help="the application's folder name in cv/company/ (see `list`)")
