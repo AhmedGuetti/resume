@@ -17,6 +17,7 @@
     python -m brain voice                                 # how you write, for the letter coach
     python -m brain catalog [--json]                      # what's in the bank
     python -m brain usage                                 # what the LLM calls cost
+    python -m brain serve [--port 8765]                   # web page of your applications
 
 Exit codes: 0 ok, 1 bad selection / bank error, 2 LaTeX failed,
 3 built but longer than one page, 4 LLM call failed, 5 already applied to this job.
@@ -36,6 +37,7 @@ from ..render.pdf import build_all, pdf_path
 from .apply import cmd_apply
 from .letter import cmd_letter, cmd_translate, cmd_voice
 from .score import cmd_score
+from .web import DEFAULT_PORT, cmd_serve
 
 
 def cmd_build(args) -> int:
@@ -165,13 +167,16 @@ def main(argv=None) -> int:
 
     sub.add_parser("usage", help="LLM spending today / this month / all time, and the budget")
 
+    sv = sub.add_parser("serve", help="read-only web page of your applications (http://127.0.0.1:8765)")
+    sv.add_argument("--port", type=int, default=DEFAULT_PORT, help=f"port (default: {DEFAULT_PORT})")
+
     c = sub.add_parser("catalog", help="list everything in the bank")
     c.add_argument("--json", action="store_true", help="full machine-readable dump")
 
     args = ap.parse_args(argv)
     commands = {"apply": cmd_apply, "build": cmd_build, "catalog": cmd_catalog, "usage": cmd_usage,
                 "score": cmd_score, "letter": cmd_letter, "voice": cmd_voice,
-                "translate": cmd_translate}
+                "translate": cmd_translate, "serve": cmd_serve}
     try:
         return commands[args.cmd](args)
     except (BankError, KeyError) as e:

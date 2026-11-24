@@ -29,6 +29,7 @@ cv/
   resume-fr.tex    French version  (generated from bank/, don't edit)
   company/<name>/  tailored resumes, one folder per application (not in git)
 pdf/               the general resume as PDF (committed so it's easy to grab)
+web/               the Svelte page of `serve` (Pico CSS), built into web/dist
 scripts/           setup script for Arch Linux on WSL2
 extras/nvim/       my Neovim config for editing LaTeX (vimtex + texlab)
 ```
@@ -285,6 +286,58 @@ ninurta> translate             # after rewriting English paragraphs: redo their 
   comments, for an editor; `--no-adapt` adds no sentence; `--check` only runs the checks.
 
 How to write each part well, with examples: [LETTERS.md](LETTERS.md).
+
+## The web page
+
+`serve` (in the shell, or `python -m brain serve`) opens a read-only page of your
+applications at http://127.0.0.1:8765: the list with fit score, verdict and status, and
+for each one its facts, requirements, the offer and links to its resume and letter PDFs.
+Applying, scoring and letters stay in the shell.
+
+Build the page once (Node 22+), then serve it:
+
+```bash
+make web
+```
+
+```bash
+make serve
+```
+
+It's a plain Svelte app with Vite and [Pico CSS](https://picocss.com) (`web/src/`), and a
+small JSON API in `brain/app/web.py` built on Python's own `http.server`. It only listens
+on 127.0.0.1 and only reads `cv/company/`. To work on the page with hot reload, run
+`python -m brain serve` in one terminal and `npm run dev` in `web/` in another.
+
+## Branches and releases
+
+GitHub Flow with two long-lived branches:
+
+| Branch | What it is |
+|---|---|
+| `main` | prod: the released version you apply with. Every release is a tag on it (`v1.0.0`, `v1.1.0`, ...). |
+| `dev` | the default branch: where work lands. New pull requests target it. |
+| `<feature>` | one short branch per change, from `dev`, merged back by pull request. |
+
+Both `main` and `dev` are protected: changes go in by pull request, and CI must pass
+(`tests`: pytest; `resume`: the main resume builds on one page in both languages and the
+committed `.tex` match the bank; `web`: the page builds).
+
+```bash
+git switch dev && git pull && git switch -c my-change
+```
+
+```bash
+gh pr create --base dev
+```
+
+To release: open a pull request from `dev` into `main`, merge it, then tag `main`.
+The tag runs `.github/workflows/release.yml`, which builds both resumes and attaches them
+to a GitHub release.
+
+```bash
+git switch main && git pull && git tag v1.1.0 && git push origin v1.1.0
+```
 
 ## Editing
 
