@@ -33,6 +33,7 @@ from ..llm import LLM
 from ..llm.fallback import model_chain, run_with_fallback
 from ..offer.record import JobRecord
 from ..paths import show
+from . import ui
 
 SUBJECT = {"en": "Application for the {job_title} position", "fr": "Candidature au poste de {job_title}"}
 RULE = "─" * 70
@@ -84,14 +85,14 @@ def wrap(text: str, indent: str = "     ", width: int = 92) -> str:
 # ---------- choosing the style ----------
 
 def choose_style(styles: dict[str, Style], suggested: str, reason: str, by: str) -> Style:
-    print(RULE)
+    print(ui.rule())
     print("Which style?")
     ids = list(styles)
     for n, sid in enumerate(ids, 1):
         s = styles[sid]
-        mark = "  <- suggested" if sid == suggested else ""
-        print(f"  {n}. {s.name}{mark}\n{wrap(s.summary)}\n{wrap('Suits: ' + s.when)}")
-    print(f"\n  Suggested: {styles[suggested].name}, because {reason} [{by}]")
+        mark = ui.green("  <- suggested") if sid == suggested else ""
+        print(f"  {ui.bold(f'{n}. {s.name}')}{mark}\n{wrap(s.summary)}\n{wrap('Suits: ' + s.when)}")
+    print(f"\n  Suggested: {ui.bold(styles[suggested].name)}, because {reason} {ui.dim(f'[{by}]')}")
     while True:
         answer = ask(f"Style [1-{len(ids)}, Enter = {ids.index(suggested) + 1}]: ").strip().lower()
         if not answer:
@@ -161,8 +162,9 @@ class Coach:
         return out.get("last", (None, [], "no model available"))
 
     def paragraph(self, n: int, total: int, para: Paragraph) -> str:
-        print(RULE)
-        print(f"{n}/{total}  {para.title.upper()}   (aim {para.words[0]}-{para.words[1]} words)")
+        print(ui.rule())
+        print(f"{ui.paint(f'{n}/{total}  {para.title.upper()}', 'bold', 'cyan')}   "
+              + ui.dim(f"(aim {para.words[0]}-{para.words[1]} words)"))
         print(wrap(para.purpose, "   "))
         print("\n   Answer these in your own words:")
         for q in para.questions:
@@ -228,35 +230,40 @@ def _load_application(name: str) -> tuple[JobRecord | None, str]:
     return record, offer
 
 
-def _report(letter: Letter, voice) -> None:
+def letter_issues(letter: Letter, voice=None) -> list[str]:
+    """Every problem the checks find in a letter, and the gaps left to fill, one line each."""
+    voice = voice or load_voice()
     bank = load_bank()
     skills, bullets = all_skills(bank), all_bullets(bank, letter.lang)
-    found = False
+    found = []
     for label, text in zip(letter.labels or [""] * len(letter.paragraphs), letter.paragraphs):
         issues = check_paragraph(text, checks=voice.checks, banned=voice.banned, skills=skills, bullets=bullets)
-        for issue in issues:
-            found = True
-            print(f"   {label.split(':')[0] or 'paragraph'}: {issue}")
-    for issue in check_letter(letter.paragraphs):
-        found = True
-        print(f"   letter: {issue}")
+        found += [f"{label.split(':')[0] or 'paragraph'}: {issue}" for issue in issues]
+    found += [f"letter: {issue}" for issue in check_letter(letter.paragraphs)]
     gaps = letter.placeholders()
     if gaps:
-        found = True
-        print(f"   still to fill: {', '.join(dict.fromkeys(gaps))}")
+        found.append(f"still to fill: {', '.join(dict.fromkeys(gaps))}")
+    return found
+
+
+def _report(letter: Letter, voice) -> None:
+    issues = letter_issues(letter, voice)
+    for issue in issues:
+        print(f"   {ui.yellow('•')} {issue}")
     total = sum(words(p) for p in letter.paragraphs)
-    print(f"   {total} words" + ("" if found else ", no problems found"))
+    print(f"   {total} words" + (f", {len(issues)} thing(s) to look at" if issues
+                                  else ", " + ui.green("no problems found")))
 
 
 def _build(letter: Letter, folder) -> int:
     try:
         pdf, pages = build_letter(letter, load_bank()["profile"], folder)
     except LatexError as e:
-        print(f"ERROR: {e}", file=sys.stderr)
+        ui.error(str(e))
         return 2
-    print(f"-> {show(pdf)} ({pages} page{'s' if pages > 1 else ''})")
+    ui.wrote(show(pdf), f"({pages} page{'s' if pages > 1 else ''})")
     if pages > 1:
-        print("WARN: the letter is longer than one page: cut the longest paragraph", file=sys.stderr)
+        ui.warn("the letter is longer than one page: cut the longest paragraph")
         return 3
     return 0
 
@@ -362,16 +369,16 @@ def cmd_letter(args) -> int:
         paragraphs.append(coach.paragraph(n, len(style.paragraphs), para))
         labels.append(f"{para.id}: {para.title}")
 
-    print(RULE)
+    print(ui.rule())
     letter = Letter(style=style.id, lang=lang, paragraphs=paragraphs, labels=labels,
                     **_header(style, lang, record, bank["profile"], ask_name=True))
     letter.save(path)
-    print(f"-> {show(path)}")
+    ui.wrote(show(path))
     _report(letter, voice)
     status = _build(letter, folder)
     for llm in llms.values():
         if llm.usage.calls:
-            print(f"   {llm.usage_line()}")
+            print(f"   {ui.dim(llm.usage_line())}")
     if letter.placeholders():
         print(f"Fill the gaps in {show(path)}, then: letter {args.company} --build")
     return status
@@ -388,7 +395,7 @@ def review_picks(style: Style, picks: dict[str, str], paras: dict, lang: str) ->
     """Show what was picked for each slot; type a slot's number to choose another paragraph."""
     slots = [p for p in style.paragraphs if p.fill != "why"]
     while True:
-        print(RULE)
+        print(ui.rule())
         print(f"Paragraphs for this letter ({style.name}):")
         for n, slot in enumerate(style.paragraphs, 1):
             if slot.fill == "why":
@@ -431,9 +438,9 @@ def assemble_letter(args, folder, record, offer, bank, styles, lang, suggestion,
         def attempt(llm):
             got, reason, warnings = pick_with_llm(llm, paras, style, lang, offer, record)
             for w in warnings:
-                print(f"   note: {w}")
+                ui.note(w)
             return got, ("bad picks" if len(warnings) >= 2 else None)
-        print(f"Picking paragraphs with {chain[0]} ...")
+        ui.doing(f"Picking paragraphs with {chain[0]} ...")
         picks.update(run_with_fallback("letter", chain, attempt, llms, label=folder.name) or {})
     if tty:
         picks = review_picks(style, picks, paras, lang)
@@ -482,19 +489,19 @@ def assemble_letter(args, folder, record, offer, bank, styles, lang, suggestion,
                     **_header(style, lang, record, bank["profile"], ask_name=tty))
     path = letter_path(folder)
     letter.save(path)
-    print(RULE)
+    print(ui.rule())
     for s, sp in zip(slots, style.paragraphs):
-        print(f"  {sp.title}: {s.key or ('AI draft' if s.fill == 'why' and not s.text.startswith('[') else 'to write')}")
+        print(f"  {ui.bold(sp.title)}: {s.key or ('AI draft' if s.fill == 'why' and not s.text.startswith('[') else 'to write')}")
         for n in s.notes:
             print(wrap("- " + n, "      "))
-    print(f"-> {show(path)}")
+    ui.wrote(show(path))
     _report(letter, voice)
     status = _build(letter, folder)
     for llm in llms.values():
         if llm.usage.calls:
-            print(f"   {llm.usage_line()}")
-    print(f"Edit {show(path)} (each paragraph's source is in the comment above it), "
-          f"then: letter {args.company} --build")
+            print(f"   {ui.dim(llm.usage_line())}")
+    print(ui.dim(f"Edit {show(path)} (each paragraph's source is in the comment above it), "
+                 f"then: letter {args.company} --build"))
     return status
 
 
@@ -535,7 +542,7 @@ def cmd_translate(args) -> int:
         save_file(f)
     for llm in llms.values():
         if llm.usage.calls:
-            print(f"   {llm.usage_line()}")
+            print(f"   {ui.dim(llm.usage_line())}")
     return 1 if failed else 0
 
 
@@ -549,14 +556,14 @@ def cmd_voice(args) -> int:
     print("Any language. Empty line to finish an answer; Enter right away keeps the current one.\n")
     for q in QUESTIONS:
         current = voice.answers.get(q, "")
-        print(RULE)
+        print(ui.rule())
         print(wrap(q, "  "))
         if current:
             print(wrap(f"(now: {current[:160]}{'...' if len(current) > 160 else ''})", "  "))
         answer = ask_block("")
         if answer:
             voice.answers[q] = answer
-    print(RULE)
+    print(ui.rule())
     banned = ask("Words or phrases you never want in a letter, comma-separated "
                  f"(now: {', '.join(voice.banned) or 'none'}; Enter keeps): ").strip()
     if banned:

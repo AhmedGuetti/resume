@@ -21,6 +21,7 @@ from ..score.competition import Snapshot, position
 from ..score.fit import fit_score
 from ..score.levels import LABELS, parse_level
 from ..score.requirements import check_requirements
+from . import ui
 from .terminal import ask_competition
 
 FALLBACK_AFTER_BAD_EVIDENCE = 3   # this many made-up evidence ids -> try the fallback model
@@ -33,7 +34,7 @@ def score_application(bank: dict, record: JobRecord, sel: Selection | None, chai
             + [(t, "nice") for t in record.skills_nice_to_have])
     result = None
     if chain and reqs:
-        print(f"Scoring the fit with {chain[0]} ...")
+        ui.doing(f"Scoring the fit with {chain[0]} ...")
 
         def attempt(llm):
             checks, summary, warnings = check_requirements(bank, reqs, sel, llm)
@@ -48,7 +49,7 @@ def score_application(bank: dict, record: JobRecord, sel: Selection | None, chai
         checks, summary, warnings = check_requirements(bank, reqs, sel, None)
         by = "keywords"
     for warning in warnings:
-        print(f"   note: {warning}")
+        ui.note(warning)
 
     you = candidate(bank)
     record.fit = fit_score(checks, you, experience_years=record.experience_years,
@@ -69,10 +70,7 @@ def score_application(bank: dict, record: JobRecord, sel: Selection | None, chai
 # ---------- printing ----------
 
 def _bar(value: float | None, width: int = 10) -> str:
-    if value is None:
-        return "-" * width
-    full = round(value * width)
-    return "█" * full + "·" * (width - full)
+    return ui.bar(value, width)
 
 
 def print_score(record: JobRecord) -> None:
@@ -84,32 +82,32 @@ def print_score(record: JobRecord) -> None:
         print("Fit: not enough to score: the offer's skills, experience, level and degree are all "
               "unknown (they're read by the AI; or add them to job.json and run `score` again)")
     elif fit.resume is not None and fit.resume != fit.bank:
-        head = f"{fit.resume}/100 for this resume ({fit.bank} with everything in your bank)"
+        head = f"{ui.score(fit.resume)} for this resume ({fit.bank} with everything in your bank)"
     else:
-        head = f"{fit.bank}/100"
+        head = ui.score(fit.bank)
     if fit.bank is not None:
-        print(f"Fit: {head}   [requirements judged by {fit.by}]")
+        print(f"{ui.bold('Fit:')} {head}   {ui.dim(f'[requirements judged by {fit.by}]')}")
         for name, part in fit.parts.items():
             print(f"   {name:<11} {_bar(part.score)}  {part.detail}")
     missing = [c.text for c in fit.requirements if c.status == "missing"]
     left_out = [c.text for c in fit.requirements if c.status in ("met", "partial") and not c.on_resume]
     unclear = [c.text for c in fit.requirements if c.status == "unclear"]
     if missing:
-        print(f"   missing: {'; '.join(missing)}")
+        print(f"   {ui.red('missing:')} {'; '.join(missing)}")
     if left_out and fit.resume is not None:
-        print(f"   in your bank but not on this resume: {'; '.join(left_out)}")
+        print(f"   {ui.yellow('in your bank but not on this resume:')} {'; '.join(left_out)}")
     if unclear:
-        print(f"   couldn't judge: {'; '.join(unclear)}")
+        print(f"   {ui.dim("couldn't judge:")} {'; '.join(unclear)}")
     if fit.summary:
-        print(f"   {fit.summary}")
+        print(f"   {ui.dim(fit.summary)}")
     if record.competition:
         snap = record.competition[-1]
         n = f"{snap.applicants}{'+' if snap.at_least else ''} applicants" if snap.applicants else "applicants: ?"
         shares = ", ".join(f"{lvl} {pct:g}%" for lvl, pct in snap.seniority.items())
-        print(f"Competition ({snap.date}): {n}" + (f"; {shares}" if shares else ""))
+        print(f"{ui.bold('Competition')} ({snap.date}): {n}" + (f"; {shares}" if shares else ""))
     if record.position:
         pos = record.position
-        print(f"Position: {pos.verdict}   (you: {LABELS[pos.your_level]}, {fit.candidate.years:g} y)")
+        print(f"{ui.bold('Position:')} {ui.verdict(pos.verdict)}   (you: {LABELS[pos.your_level]}, {fit.candidate.years:g} y)")
         for reason in pos.reasons:
             print(f"   - {reason}")
 
