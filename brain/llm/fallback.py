@@ -48,7 +48,8 @@ def run_with_fallback(task: str, chain: list[str], attempt: Attempt, llms: dict[
         if problem is None:
             return result
         nxt = chain[i + 1] if i + 1 < len(chain) else None
-        print(f"   {model_id} ({task}): {problem}" + (f" -> trying {nxt}" if nxt else ""))
+        from ..app import ui
+        print(f"   {ui.yellow(f'{model_id} ({task}):')} {problem}" + (f" -> trying {nxt}" if nxt else ""))
         if nxt is None and result is not None:
             return result
     return None

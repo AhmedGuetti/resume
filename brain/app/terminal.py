@@ -30,7 +30,8 @@ def read_pasted_offer() -> str:
     Piped input (`... < offer.txt`) is read as is."""
     if not sys.stdin.isatty():
         return sys.stdin.read()
-    print("Paste the job offer, then type END on its own line (or press Ctrl-D):")
+    from . import ui
+    print(ui.bold("Paste the job offer, then type END on its own line (or press Ctrl-D):"))
     try:
         import readline                           # keep pasted lines out of the shell history
         history_length = readline.get_current_history_length()
@@ -97,8 +98,11 @@ def ask_missing(info: dict, fields=ASK_FIELDS) -> list[str]:
 
 
 def print_job(record: JobRecord) -> None:
+    from . import ui
+
     def show_field(label, value):
-        print(f"   {label:<11} {value if value not in (None, '', []) else '-'}")
+        shown = value if value not in (None, '', []) else ui.dim('-')
+        print(f"   {ui.dim(f'{label:<11}')} {ui.bold(shown) if label in ('company', 'title') else shown}")
     show_field("company", record.company)
     show_field("title", record.job_title)
     show_field("location", " / ".join(x for x in (record.location, record.work_mode) if x) or None)

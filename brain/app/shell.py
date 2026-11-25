@@ -26,7 +26,7 @@ from ..bank import LANGS
 from ..config import task_models
 from ..paths import show
 from ..render.pdf import pdf_path
-from . import cli
+from . import cli, ui
 from .score import print_score
 from .terminal import print_job
 
@@ -40,13 +40,25 @@ FLAG_VALUES = {"--only": ["resume", "letter"], "--lang": list(LANGS),
                "--style": ["direct", "warm", "formal", "story"]}
 
 
+def _prompt() -> str:
+    """The prompt, colored; \\001/\\002 tell readline the color codes take no room."""
+    if not ui.enabled():
+        return "ninurta> "
+    return "\001\x1b[1;36m\002ninurta\001\x1b[0;2m\002>\001\x1b[0m\002 "
+
+
+def _intro() -> str:
+    return (ui.paint("Ninurta", "bold", "cyan") + ui.dim("  ·  `help` for commands, `exit` to quit") + "\n"
+            + f"Start with: {ui.bold('apply')}  " + ui.dim("(paste an offer: resume + cover letter in its language)"))
+
+
 class Shell(cmd.Cmd):
     prompt = "ninurta> "
-    intro = ("Ninurta. Type `help` for commands, `exit` to quit.\n"
-             "Start with: apply  (paste an offer: resume + cover letter in its language)")
+    intro = "Ninurta. Type `help` for commands, `exit` to quit."
 
     def __init__(self) -> None:
         super().__init__()
+        self.prompt, self.intro = _prompt(), _intro()
         self.override: str | None = None      # None = models from config.yaml, "off" = no AI, or a model id
         self.started = datetime.now().isoformat(timespec="seconds")
 
@@ -57,7 +69,7 @@ class Shell(cmd.Cmd):
         try:
             args = shlex.split(line)
         except ValueError as e:
-            print(f"error: {e}")
+            print(f"{ui.red('error:')} {e}")
             return
         try:
             cli.main([command, *args])
@@ -318,9 +330,11 @@ class Shell(cmd.Cmd):
                 record = None
             fit = record.fit if record else None
             total = (fit.resume if fit.resume is not None else fit.bank) if fit else None
-            score = f"fit {total:>3}" if total is not None else "fit   -"
-            verdict = record.position.verdict if record and record.position else ""
-            print(f"  {when:%Y-%m-%d %H:%M}  {folder.name:<30} {pdfs or '(no PDF)':<13} {score}  {verdict}")
+            score = (ui.paint(f"fit {total:>3}", ui.level_color(total / 100)) if total is not None
+                     else ui.dim("fit   -"))
+            verdict = ui.verdict(record.position.verdict) if record and record.position else ""
+            print(f"  {ui.dim(f'{when:%Y-%m-%d %H:%M}')}  {ui.bold(f'{folder.name:<30}')} "
+                  f"{pdfs or '(no PDF)':<13} {score}  {verdict}")
 
     def do_open(self, line: str) -> None:
         """open COMPANY [en|fr] [letter]
@@ -419,14 +433,15 @@ class Shell(cmd.Cmd):
             doc = (getattr(self, f"do_{name}").__doc__ or "").strip().splitlines()
             lines = [l.strip() for l in doc[1:] if l.strip() and not l.strip().startswith("[")]
             summary = re.split(r"\. (?=[A-Z`])|:\s|,$| \(", lines[0])[0].rstrip(".,") if lines else ""
-            print(f"  {'!CMD' if name == 'shell' else name:<9} {summary}")
-        print("Details: help COMMAND")
+            label = "!CMD" if name == "shell" else name
+            print(f"  {ui.cyan(f'{label:<9}')} {summary}")
+        print(ui.dim("Details: help COMMAND"))
 
     def emptyline(self) -> None:
         pass                                   # default would repeat the last command
 
     def default(self, line: str) -> None:
-        print(f"unknown command: {line.split()[0]}  (type `help`)")
+        print(f"{ui.red('unknown command:')} {line.split()[0]}  {ui.dim('(type `help`)')}")
 
 
 def run_shell() -> int:
