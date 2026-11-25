@@ -148,3 +148,28 @@ fr: >-
   sur Confluence et une vidéo de démonstration commentée, pour que l'équipe puisse s'en
   servir sans moi.
 translated_from: 37c601c6
+
+## story-qa-ai
+kind: story
+tags: [qa, testing, cucumber, xray, jira, confluence, agile, agents, llm, api-testing, ownership]
+by: claude
+en: >-
+  At Magellan I was an AI engineer inside a QA team, not next to it. Day to day, I worked
+  the way the testers did: tasks in Jira, Cucumber scenarios managed in Jira Xray, test
+  reports and documentation on Confluence, and API testing for RATP. That is what shaped the
+  agents I built. aTaS generates test cases in the format the team already used, BugPredict
+  pulls its context straight from Jira and Confluence, and ARGUS lets testers assemble their
+  own agents without code. As the owner of those projects, I reviewed and approved every
+  merge request before it reached production. At the end of the work-study, I was offered a
+  position to stay.
+fr: >-
+  Chez Magellan, j'étais un ingénieur IA au sein d'une équipe QA, et non à côté d'elle. Au
+  quotidien, je travaillais comme les testeurs : tâches dans Jira, scénarios Cucumber gérés
+  dans Jira Xray, rapports de test et documentation sur Confluence, et tests des API de la
+  RATP. C'est ce qui a façonné les agents que j'ai construits. aTaS génère des cas de test
+  dans le format que l'équipe utilisait déjà, BugPredict va chercher son contexte
+  directement dans Jira et Confluence, et ARGUS permet aux testeurs d'assembler leurs
+  propres agents sans coder. Responsable de ces projets, je relisais et validais chaque
+  merge request avant son passage en production. À la fin de l'alternance, on m'a proposé de
+  rester.
+translated_from: b85926d8

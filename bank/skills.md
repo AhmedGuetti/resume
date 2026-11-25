@@ -67,6 +67,8 @@ label: Tools | Outils
 - Git
 - GitLab Flow
 - Jira / Jira Xray
+- Cucumber (Gherkin)
+- Postman
 - Confluence
 - Figma
 - Excel
@@ -77,6 +79,8 @@ label: Tools | Outils
 ## testing
 label: Testing and QA | Tests et QA
 - API testing | tests d'API
+- BDD test scenarios (Cucumber, Gherkin) | scénarios de test BDD (Cucumber, Gherkin)
+- test management and reporting (Jira Xray) | gestion et reporting des tests (Jira Xray)
 - benchmarking and evaluation | benchmark et évaluation
 - LLM test-case generation | génération de cas de test par LLM
 - bug-detection benchmarks (BigVul, Defects4J, SWE-bench, CASCADE) | benchmarks de détection de bugs (BigVul, Defects4J, SWE-bench, CASCADE)
