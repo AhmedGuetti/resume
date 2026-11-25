@@ -293,6 +293,11 @@ tags: gitlab, git, team-practices, release-engineering
 en: Set up GitLab Flow for the team: protected main branch, squash-on-merge and semantic version tags.
 fr: Mise en place de GitLab Flow pour l'équipe : branche main protégée, squash au merge et tags de version sémantique.
 
+## team-hermes-agent
+tags: ai-coding-agents, hermes-agent, agents, frontend, automation, productivity
+en: Used Hermes Agent, an AI agent, to build web pages faster and to automate routine tasks.
+fr: Utilisation de Hermes Agent, un agent IA, pour développer plus vite des pages web et automatiser les tâches courantes.
+
 ## team-agile
 tags: agile, kanban, jira, confluence, communication
 en: Worked in a Kanban setup with Jira and documented the projects on Confluence.
