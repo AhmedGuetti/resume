@@ -13,6 +13,8 @@ The steps, in order (each one is a function below):
     7. fit_one_page         drop the weakest bullets, or add the next best, until it fills one page
     8. write_selection      selection.yaml: what was picked and why, to edit and rebuild by hand
     9. score_application    fit score, competition (asked to you) and position -> job.json (app/score.py)
+       gap_interview        missing requirements: asks you, adds approved bullets to the bank,
+                            then redoes 6-9 (app/gaps.py; --no-gaps skips it)
    10. make_letter          the cover letter, assembled from bank/letters/ (app/letter.py)
 
 --only resume / --only letter makes just one of the two (steps 6-9 or step 10).
@@ -167,8 +169,29 @@ def offer_language(record: JobRecord, offer: str, forced: str | None = None) -> 
 
 
 def make_resume(run: Run, record: JobRecord, offer: str, folder: Path, lang: str) -> int:
-    """Steps 6-9: the one-page resume in `lang`, then the fit score."""
+    """Steps 6-9: the one-page resume in `lang`, then the fit score, then (if you want)
+    the gap interview; when it added something to the bank, the resume and score are redone."""
     run.step("The resume")
+    n, sel = build_resume(run, record, offer, folder, lang)
+    if not run.args.no_score:
+        run.step("Fit score")
+        score_application(load_bank(), record, sel, run.chain("score"), run.llms, label=folder.name)
+        record.save(folder / "job.json")
+        print_score(record)
+        if gap_interview(run, record, folder):
+            ui.doing("Rebuilding the resume with your new bullets ...")
+            n, sel = build_resume(run, record, offer, folder, lang)
+            score_application(load_bank(), record, sel, run.chain("score"), run.llms,
+                              label=folder.name, ask=False)
+            record.save(folder / "job.json")
+            print_score(record)
+    for llm in run.used():
+        print(f"   {ui.dim(llm.usage_line())}")
+    return EXIT_TOO_LONG if n > 1 else 0
+
+
+def build_resume(run: Run, record: JobRecord, offer: str, folder: Path, lang: str) -> tuple[int, Selection]:
+    """Steps 6-8: pick, fit to one page, write selection.yaml. Returns (pages, selection)."""
     bank = load_bank()
     sel, report = pick_content(run, bank, offer, folder)
     sel.languages = [lang]                     # `build selection.yaml` rebuilds the same language
@@ -176,14 +199,26 @@ def make_resume(run: Run, record: JobRecord, offer: str, folder: Path, lang: str
     write_selection(folder, sel, report, record, run.used(), dropped, added)
     n = pages[lang]
     ui.wrote(show(pdf_path(folder, lang)), f"({n} page{'s' if n > 1 else ''})")
-    if not run.args.no_score:
-        run.step("Fit score")
-        score_application(bank, record, sel, run.chain("score"), run.llms, label=folder.name)
-        record.save(folder / "job.json")
-        print_score(record)
-    for llm in run.used():
-        print(f"   {ui.dim(llm.usage_line())}")
-    return EXIT_TOO_LONG if n > 1 else 0
+    return n, sel
+
+
+def gap_interview(run: Run, record: JobRecord, folder: Path) -> bool:
+    """Offers the gap interview (app/gaps.py) when the offer asks for things the bank lacks.
+    Only in a terminal, with a model, and not with --no-gaps. True if the bank grew."""
+    from .gaps import interview, to_ask
+    if getattr(run.args, "no_gaps", False) or not sys.stdin.isatty():
+        return False
+    chain = run.chain("gaps")
+    checks = to_ask(record, paths.BANK / "gaps.md")
+    if not chain or not checks:
+        return False
+    n = len(checks)
+    if not confirm(f"{n} requirement{'s' if n > 1 else ''} of this offer {'are' if n > 1 else 'is'} "
+                   "missing or partial in your bank. Answer a few questions to add them?"):
+        return False
+    from ..llm import get_llm
+    llm = run.llms.setdefault(chain[0], get_llm(chain[0]))
+    return bool(interview(record, llm, folder.name))
 
 
 def make_letter(folder: Path, lang: str, args) -> int:

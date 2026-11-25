@@ -109,7 +109,7 @@ class Shell(cmd.Cmd):
     # ---------- commands ----------
 
     def do_apply(self, line: str) -> None:
-        """apply ["Company X"] [--offer FILE] [--url LINK] [--paste] [--force] [--model ID] [--no-ai] [--no-fill]
+        """apply ["Company X"] [--offer FILE] [--url LINK] [--paste] [--force] [--model ID] [--no-ai] [--no-fill] [--no-gaps]
                 [--only resume|letter] [--lang en|fr]
         Paste a job offer, get a tailored resume and cover letter in its language.
         They go in cv/company/<name>/ (French offer -> French resume and letter).
@@ -132,6 +132,15 @@ class Shell(cmd.Cmd):
         self.run("score", self.with_model(line))
 
     complete_score = complete_company
+
+    def do_gaps(self, line: str) -> None:
+        """gaps COMPANY [--model ID]
+        Questions about the requirements of that offer your bank is missing (from its fit
+        score). Answer in your own words: the AI drafts a bank bullet from your answer only,
+        you accept, edit or skip it. "n" = you don't have it: not asked again (bank/gaps.md)."""
+        self.run("gaps", self.with_model(line))
+
+    complete_gaps = complete_company
 
     def do_letter(self, line: str) -> None:
         """letter COMPANY [--style direct|warm|formal|story] [--lang en|fr] [--write] [--skeleton] [--check] [--build] [--no-adapt] [--no-ai]

@@ -222,6 +222,23 @@ The numbers change: run `python -m brain score company-x` (or `score company-x` 
 competition and re-score. `list` shows every application's fit and verdict, `show` the details.
 `apply --no-score` skips this step.
 
+### Growing the bank from the gaps
+
+After the score, `apply` offers a **gap interview** for the requirements it marked missing or
+partial (`--no-gaps` turns it off; `python -m brain gaps company-x` runs it later, from the saved score).
+For each one you answer in your own words:
+
+- **Enter** skips it, **q** stops.
+- **n** means you don't have it: a keyword you choose (e.g. `ALM Octane`) goes in `bank/gaps.md`,
+  and any later requirement that mentions it isn't asked again.
+- Anything else is your answer. The AI drafts **one bank bullet from that answer only** (English,
+  French, tags, the entry it belongs to), or asks a follow-up when the answer is too vague. You
+  accept, edit the fields, ask for a change, or skip. If it's already in the bank, it says so.
+
+Only an accepted draft is written: appended to the entry's file with a comment saying when and for
+which offer, checked by reloading the bank (undone if it would break it). Then the resume and the
+score are redone with it. Review everything with `git diff bank/`.
+
 The result is a starting point. Edit `selection.yaml` if you disagree, then rebuild:
 
 ```bash
@@ -237,6 +254,7 @@ brain/
   offer/     a job offer: facts checked against its text, job.json, already applied?
   pick/      choose content for an offer (keywords or LLM), fit it on one page
   score/     fit score against the offer, competition, position
+  gaps/      gap interview: your answers -> checked bank bullets, "no" answers in bank/gaps.md
   render/    selection -> LaTeX -> PDF
   letter/    cover letters: styles, bank/letters/ paragraphs, assembling, checks, letter.md -> PDF
   llm/       one client per provider, fallback chain, spending log and budget
