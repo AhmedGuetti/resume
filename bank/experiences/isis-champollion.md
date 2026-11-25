@@ -15,6 +15,9 @@ conflicts:                # at most one bullet of each group on a resume (enforc
   - [easytalk-stack, easytalk-models]
   - [easyrmm-pitch, easyrmm-refactor, easyrmm-results-short]
   - [easyrmm-results, easyrmm-results-short]
+  # Balance cap, not a duplicate group: at most ONE soft/research-output bullet per resume,
+  # so ISIS always shows technical work (NLP pipeline, Docker/FastAPI, refactoring results).
+  - [isis-interdisciplinary, isis-report, easytalk-poster]
 ---
 
 <!--

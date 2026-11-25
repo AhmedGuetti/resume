@@ -18,6 +18,11 @@ conflicts:                # at most one bullet of each group on a resume (enforc
   - [cicd-both-projects, argus-cicd]
   - [handover, bugpredict-handover]
   - [handover, argus-handover]
+  - [qa-xray-cucumber, qa-xray-cucumber-short, qa-agile-workflow]
+  - [qa-agile-workflow, team-agile]
+  # Balance cap, not a duplicate group: at most ONE process/management bullet per resume,
+  # so Magellan always reads mostly technical (agents, MCP, CI/CD, evaluation, QA testing).
+  - [bugpredict-ownership, team-agile, qa-agile-workflow, qa-ai-bridge, team-code-review, team-offer, team-gitlab-flow, handover, bugpredict-handover, argus-handover, argus-adoption]
 ---
 
 <!--
@@ -25,7 +30,12 @@ Bullet bank: pick 4–6 sections per application, filtered by tags.
 Job title: the contract title is "Automation Engineer" (the HR system had no AI engineer
 title); the work itself was AI/ML engineering for the QA department, which the title above describes.
 Conventions:
-  - Slugs are prefixed by project: atas-, bugpredict-, argus-, team-
+  - Slugs are prefixed by project: atas-, bugpredict-, argus-, qa-, team-
+QA side (user's answers, Nov. 2026): agile QA team, Jira + Confluence, tests written in
+Cucumber and managed in Jira Xray, test reports. Postman only briefly (keep it minor).
+No usage or time-saved numbers exist for these projects: don't invent any.
+Offer to stay: received at the end of the work-study, declined only because the post had
+to be filled at once and the user needed ~2 months for administrative papers.
   - Project order: aTaS (team of 5) → BugPredict (3 incl. PM) → ARGUS (solo)
   - "-short" = compact variant of the same fact (never use both)
   - tag "to-confirm" = not yet verified. Do not ship until confirmed.
@@ -271,6 +281,11 @@ tags: ci-cd, gitlab, devops, release-engineering
 en: Set up GitLab CI/CD for BugPredict and ARGUS, building the executable and publishing clearly versioned releases.
 fr: Mise en place de la CI/CD GitLab pour BugPredict et ARGUS : construction de l'exécutable et publication de releases clairement versionnées.
 
+## argus-on-demand
+tags: agents, no-code, product, stakeholders, yaml
+en: Used ARGUS to build agents on the fly for colleagues' requests: any number of agents, each assembled from configuration rather than new code.
+fr: Utilisation d'ARGUS pour créer des agents à la demande pour les collègues : autant d'agents que nécessaire, chacun assemblé par configuration plutôt que par du nouveau code.
+
 ## argus-adoption
 tags: adoption, product, feedback
 en: Trialled by other teams at pre-production stage.
@@ -285,6 +300,33 @@ fr: Évaluation d'un agent ARGUS de détection d'incohérences spécification/co
 tags: documentation, communication, demo, confluence, figma
 en: Prepared the ARGUS handover: Confluence documentation, Figma/SVG visuals, a narration script and a product demo video.
 fr: Préparation de la passation d'ARGUS : documentation Confluence, visuels Figma/SVG, script de narration et vidéo de démo produit.
+
+<!-- ================================ QA ================================ -->
+
+## qa-xray-cucumber
+tags: qa, testing, bdd, cucumber, gherkin, jira, xray, test-management, reporting
+en: Organised testing in Jira Xray within the QA team: wrote Cucumber (Gherkin) scenarios linked to user stories, grouped them into test executions and produced the test reports.
+fr: Organisation des tests dans Jira Xray au sein de l'équipe QA : rédaction de scénarios Cucumber (Gherkin) liés aux user stories, regroupement en exécutions de test et production des rapports de test.
+
+## qa-xray-cucumber-short
+tags: qa, testing, bdd, cucumber, xray
+en: Wrote Cucumber (Gherkin) test scenarios and test reports in Jira Xray.
+fr: Rédaction de scénarios de test Cucumber (Gherkin) et de rapports de test dans Jira Xray.
+
+## qa-agile-workflow
+tags: qa, agile, kanban, jira, xray, cucumber, confluence, test-management
+en: Worked in an agile QA team: tasks tracked in Jira, tests written in Cucumber and managed in Xray, documentation and reports on Confluence.
+fr: Travail dans une équipe QA agile : tâches suivies dans Jira, tests écrits en Cucumber et gérés dans Xray, documentation et rapports sur Confluence.
+
+## qa-api-testing
+tags: qa, api-testing, testing, postman, cucumber
+en: Tested RATP APIs as part of the QA team, with Cucumber scenarios in Xray and quick manual checks in Postman.
+fr: Tests des API de la RATP au sein de l'équipe QA, avec des scénarios Cucumber dans Xray et des vérifications manuelles ponctuelles dans Postman.
+
+## qa-ai-bridge
+tags: qa, agents, llm, testing, product, xray, jira
+en: Worked at the junction of AI and QA: as a member of the QA team, I built agents that fit how testers actually write, track and report tests in Jira Xray.
+fr: À la croisée de l'IA et de la QA : membre de l'équipe QA, j'ai construit des agents adaptés à la façon dont les testeurs écrivent, suivent et rapportent réellement leurs tests dans Jira Xray.
 
 <!-- ======================= TEAM / WAY OF WORKING ======================= -->
 
@@ -307,3 +349,13 @@ fr: Travail en Kanban avec Jira et documentation des projets sur Confluence.
 tags: documentation, communication, demo
 en: Produced demo and handover material (documentation, diagrams, demo video) for both projects.
 fr: Supports de démo et de passation (documentation, schémas, vidéo) pour les deux projets.
+
+## team-code-review
+tags: code-review, ownership, git, gitlab, team-practices
+en: As project owner, reviewed and approved the merge requests on my projects before they reached production.
+fr: En tant que responsable du projet, relecture et validation des merge requests avant leur passage en production.
+
+## team-offer
+tags: recognition, ownership, impact
+en: Offered a position to stay on at the end of the work-study.
+fr: Proposition de poste pour rester à l'issue de l'alternance.
