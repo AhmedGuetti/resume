@@ -30,6 +30,7 @@ label: AI/ML | IA/ML
 - DSPy
 - Gemini / Vertex AI
 - LLM-as-judge
+- AI coding agents (Claude Code, Hermes Agent) | agents de code IA (Claude Code, Hermes Agent)
 - human-in-the-loop agents | agents human-in-the-loop
 - PyTorch
 - computer vision | vision par ordinateur
@@ -59,6 +60,9 @@ label: Tools | Outils
 - axum
 - PostgreSQL / pgvector
 - GCP
+<!-- Google Cloud and Kubernetes: the basics (deploy containers, use storage, Vertex AI), not expert level -->
+- Google Cloud (Vertex AI, GKE, Cloud Storage)
+- Kubernetes
 - GitLab CI/CD
 - Git
 - GitLab Flow

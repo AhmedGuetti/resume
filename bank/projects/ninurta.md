@@ -22,3 +22,8 @@ fr: Conception d'un système multi-agents qui adapte mon CV à chaque offre à p
 tags: analytics, statistics, product
 en: Tracking statistics on submitted applications and suggesting how to adjust their volume and targeting.
 fr: Statistiques sur les candidatures envoyées et suggestions pour ajuster leur volume et leur ciblage.
+
+## claude-code
+tags: claude-code, ai-assisted-development, llm, agents, automation
+en: Developed with Claude Code (AI-assisted development), from the multi-agent pipeline to the command line and the web page.
+fr: Développé avec Claude Code (développement assisté par IA), du pipeline multi-agents à la ligne de commande et à la page web.
