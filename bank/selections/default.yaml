@@ -29,6 +29,7 @@ experience:
 projects:
   - id: gmath
   - id: ninurta
+    bullets: [resume-tailoring, application-stats]
 
 skills:
   - id: languages

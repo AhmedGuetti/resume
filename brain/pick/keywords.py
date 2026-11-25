@@ -35,6 +35,8 @@ SYNONYMS = {
     "backend": ["back-end", "back end"],
     "research": ["recherche", "r&d"],
     "postgresql": ["postgres"],
+    "gcp": ["google cloud", "google cloud platform"],
+    "kubernetes": ["k8s", "gke"],
     "databases": ["database", "base de données", "bases de données", "sql"],
     "machine-translation": ["traduction automatique"],
     "information-extraction": ["extraction d'information", "named entity", "ner"],
