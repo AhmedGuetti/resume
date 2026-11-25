@@ -10,6 +10,7 @@
     python -m brain apply "Company X" --lang en           # both documents in English, whatever the offer's language
     python -m brain build SELECTION [--out DIR]           # PDFs from a selection file
     python -m brain score company-x                       # fit score, competition, position
+    python -m brain gaps company-x                        # questions about missing requirements -> new bank bullets
     python -m brain letter company-x                      # cover letter from bank/letters/, fitted to the offer
     python -m brain letter company-x --write              # ... or write it paragraph by paragraph, with a coach
     python -m brain translate                             # French of the letter paragraphs whose English changed
@@ -35,6 +36,7 @@ from ..errors import LatexError
 from ..paths import show
 from ..render.pdf import build_all, pdf_path
 from .apply import cmd_apply
+from .gaps import cmd_gaps
 from .letter import cmd_letter, cmd_translate, cmd_voice
 from .score import cmd_score
 from .web import DEFAULT_PORT, cmd_serve
@@ -121,6 +123,8 @@ def main(argv=None) -> int:
     a.add_argument("--no-fill", action="store_true",
                    help="only keep matching content, don't add more to fill the page")
     a.add_argument("--no-score", action="store_true", help="skip the fit score and competition questions")
+    a.add_argument("--no-gaps", action="store_true",
+                   help="don't offer the gap interview (questions about requirements missing from your bank)")
     a.add_argument("--only", choices=["resume", "letter"],
                    help="make just the resume or just the cover letter (default: both)")
     a.add_argument("--lang", choices=LANGS,
@@ -131,6 +135,10 @@ def main(argv=None) -> int:
     s.add_argument("--model", help="LLM that judges the requirements (default: `models.score` in config.yaml)")
     s.add_argument("--no-ai", action="store_true", help="judge the requirements by keyword matching")
     s.add_argument("--no-ask", action="store_true", help="don't ask for the competition numbers")
+
+    g = sub.add_parser("gaps", help="questions about an offer's missing requirements, to grow the bank")
+    g.add_argument("company", help="the application's folder name in cv/company/ (see `list`)")
+    g.add_argument("--model", help="LLM that drafts the bullets (default: `models.gaps` in config.yaml)")
 
     lt = sub.add_parser("letter", help="write the cover letter for an application, paragraph by paragraph")
     lt.add_argument("company", help="the application's folder name in cv/company/ (see `list`)")
@@ -175,7 +183,7 @@ def main(argv=None) -> int:
 
     args = ap.parse_args(argv)
     commands = {"apply": cmd_apply, "build": cmd_build, "catalog": cmd_catalog, "usage": cmd_usage,
-                "score": cmd_score, "letter": cmd_letter, "voice": cmd_voice,
+                "score": cmd_score, "gaps": cmd_gaps, "letter": cmd_letter, "voice": cmd_voice,
                 "translate": cmd_translate, "serve": cmd_serve}
     try:
         return commands[args.cmd](args)
@@ -186,7 +194,7 @@ def main(argv=None) -> int:
         print(f"ERROR: {e}", file=sys.stderr)
         return 2
     except Exception as e:                       # LLM / network / API key problems
-        if args.cmd not in ("apply", "score"):
+        if args.cmd not in ("apply", "score", "gaps"):
             raise
         print(f"ERROR: {type(e).__name__}: {e}", file=sys.stderr)
         print("Tip: --no-ai builds the resume with keyword matching instead.", file=sys.stderr)

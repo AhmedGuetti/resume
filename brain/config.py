@@ -43,8 +43,8 @@ def load_config() -> dict:
 
 
 def task_models() -> dict[str, str | None]:
-    """{"extract": id, "select": id, "score": id, "letter": id, "fallback": id}; None = not set.
-    `score` and `letter` default to the `select` model."""
+    """{"extract": id, "select": id, "score": id, "letter": id, "gaps": id, "fallback": id};
+    None = not set. `score`, `letter` and `gaps` default to the `select` model."""
     cfg = load_config()
     models = cfg.get("models") or {}
     single = cfg.get("model")
@@ -53,6 +53,7 @@ def task_models() -> dict[str, str | None]:
             "select": select,
             "score": models.get("score") or select,
             "letter": models.get("letter") or select,
+            "gaps": models.get("gaps") or select,
             "fallback": models.get("fallback")}
 
 

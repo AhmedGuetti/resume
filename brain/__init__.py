@@ -7,6 +7,7 @@ The packages follow the path of one application:
     offer/    a job offer: its facts (checked against its text), job.json, duplicates
     pick/     choose the content for an offer (keywords or LLM), fit it on one page
     score/    how well you fit the offer, and where you stand among the applicants
+    gaps/     gap interview: your answers about missing requirements -> bank bullets you approve
     render/   selection -> LaTeX -> PDF
     letter/   the cover letter coach: four styles, your voice, checks, letter.md -> PDF
     llm/      model backends, fallback chain, spending log and budget
