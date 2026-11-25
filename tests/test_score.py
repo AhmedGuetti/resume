@@ -236,3 +236,31 @@ def test_score_application_fills_and_round_trips(bank, default_sel, tmp_path):
     again = JobRecord.load(path)
     assert again.fit == record.fit and again.position == record.position
     assert again.competition == record.competition
+
+
+# ---------- letter ↔ offer ----------
+
+from brain.app import ui
+from brain.score.letter import LetterMatch, letter_match
+
+
+def test_letter_match_counts_must_haves_and_offer_keywords(bank):
+    offer = "We need Python and LangGraph. Docker is required."
+    letter = "I built LLM agents with LangGraph in Python at Magellan."
+    m = letter_match(bank, offer, ["Python", "LangGraph", "Docker"], letter)
+    assert m.required_hit == ["Python", "LangGraph"] and m.required_missed == ["Docker"]
+    assert "langgraph" in m.keywords_hit and "docker" in m.keywords_missed
+    assert 0 < m.score < 100
+
+
+def test_letter_match_score_without_requirements_uses_keywords_only():
+    assert LetterMatch(keywords_hit=["a"], keywords_missed=["b"]).score == 50
+    assert LetterMatch().score is None
+
+
+def test_box_is_plain_and_aligned_without_a_terminal(capsys, monkeypatch):
+    monkeypatch.delenv("FORCE_COLOR", raising=False)
+    ui.box("Scores", ["resume  72/100", "x" * 200])
+    lines = capsys.readouterr().out.splitlines()
+    assert "\x1b" not in "".join(lines)
+    assert {len(l) for l in lines} == {ui.WIDTH}

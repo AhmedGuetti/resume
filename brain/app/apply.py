@@ -43,7 +43,9 @@ from ..pick.fit import add, fill_candidates, shrink, undo
 from ..pick.keywords import select as keyword_select
 from ..pick.report import MatchReport
 from ..render.pdf import build_all, pdf_path
+from . import ui
 from .score import print_score, score_application
+from .summary import print_summary
 from .terminal import ask_link, ask_missing, confirm, print_job, read_pasted_offer
 
 MAX_FILL_MISSES = 3         # stop filling after this many tries in a row don't fit
@@ -74,6 +76,12 @@ class Run:
     """What one apply run carries from step to step."""
     args: object
     llms: dict[str, LLM] = field(default_factory=dict)   # every model used, for the cost lines
+    steps: list[str] = field(default_factory=list)       # the step headings of this run, in order
+    done: int = 0
+
+    def step(self, title: str) -> None:
+        self.done += 1
+        ui.step(title, self.done, len(self.steps))
 
     def chain(self, task: str) -> list[str]:
         return model_chain(task, self.args.model, self.args.no_ai)
@@ -101,10 +109,18 @@ def unique_folder(slug: str) -> Path:
 # ---------- the command ----------
 
 def cmd_apply(args) -> int:
+    from datetime import datetime
+    started = datetime.now().isoformat(timespec="seconds")
     run = Run(args)
     only = getattr(args, "only", None)
+    run.steps = ["The offer"]
+    if only != "letter":
+        run.steps += ["The resume"] + ([] if getattr(args, "no_score", False) else ["Fit score"])
+    if only != "resume":
+        run.steps.append("Cover letter")
     status = 0
     try:
+        run.step("The offer")
         offer = get_offer(args)
         if offer.is_new:
             check_already_applied(offer, args)
@@ -120,11 +136,14 @@ def cmd_apply(args) -> int:
             status = make_resume(run, record, offer.text, folder, lang)
     except Stop as stop:
         if str(stop):
-            print(str(stop), file=sys.stderr if stop.code == EXIT_BAD_INPUT else sys.stdout)
+            print(ui.paint(str(stop), "bold", "red" if stop.code == EXIT_BAD_INPUT else "yellow"),
+                  file=sys.stderr if stop.code == EXIT_BAD_INPUT else sys.stdout)
         return stop.code
 
     if only != "resume":
+        run.step("Cover letter")
         status = max(status, make_letter(folder, lang, args))
+    print_summary(record, folder, lang, offer.text, only=only, status=status, since=started)
     return status
 
 
@@ -143,37 +162,34 @@ def offer_language(record: JobRecord, offer: str, forced: str | None = None) -> 
     else:
         lang, why = guess_language(offer), "guessed from the offer's words"
     record.language = lang
-    print(f"Language: {LANGUAGE_NAME[lang]} ({why}). --lang en|fr changes it.")
+    print(f"{ui.bold('Language:')} {ui.cyan(LANGUAGE_NAME[lang])} {ui.dim(f'({why}; --lang en|fr changes it)')}")
     return lang
 
 
 def make_resume(run: Run, record: JobRecord, offer: str, folder: Path, lang: str) -> int:
     """Steps 6-9: the one-page resume in `lang`, then the fit score."""
+    run.step("The resume")
     bank = load_bank()
     sel, report = pick_content(run, bank, offer, folder)
     sel.languages = [lang]                     # `build selection.yaml` rebuilds the same language
     pages, dropped, added = fit_one_page(bank, sel, report, folder, run.args.no_fill, [lang])
     write_selection(folder, sel, report, record, run.used(), dropped, added)
+    n = pages[lang]
+    ui.wrote(show(pdf_path(folder, lang)), f"({n} page{'s' if n > 1 else ''})")
     if not run.args.no_score:
+        run.step("Fit score")
         score_application(bank, record, sel, run.chain("score"), run.llms, label=folder.name)
         record.save(folder / "job.json")
         print_score(record)
-
     for llm in run.used():
-        print(f"   {llm.usage_line()}")
-    n = pages[lang]
-    print(f"-> {show(pdf_path(folder, lang))} ({n} page{'s' if n > 1 else ''})")
-    print(f"-> {show(folder / 'selection.yaml')} (what was picked, and why)")
-    print(f"-> {show(folder / 'job.json')} (facts from the offer, fit score, competition)")
+        print(f"   {ui.dim(llm.usage_line())}")
     return EXIT_TOO_LONG if n > 1 else 0
 
 
 def make_letter(folder: Path, lang: str, args) -> int:
     """Step 10: the cover letter, in the same language as the resume."""
     import argparse
-    from .letter import RULE, cmd_letter
-    print(RULE)
-    print(f"Cover letter ({LANGUAGE_NAME[lang]})")
+    from .letter import cmd_letter
     letter_args = argparse.Namespace(
         company=folder.name, style=None, lang=lang, write=False, no_adapt=False, skeleton=False,
         check=False, build=False, force=False, model=args.model, no_ai=args.no_ai)
@@ -188,7 +204,7 @@ def get_offer(args) -> Offer:
     if args.offer:
         text = Path(args.offer).read_text(encoding="utf-8")
     elif named and (named / "offer.md").exists() and not args.paste:
-        print(f"Using the saved offer in {show(named / 'offer.md')}")
+        ui.doing(f"Using the saved offer in {show(named / 'offer.md')}")
         return Offer((named / "offer.md").read_text(encoding="utf-8"), is_new=False, named=named)
     else:
         text = read_pasted_offer()
@@ -203,7 +219,7 @@ def check_already_applied(offer: Offer, args) -> None:
     offer.key = dedup.job_key(offer.url)
     same = dedup.find_same_job(paths.COMPANIES, offer.key, dedup.offer_hash(offer.text))
     if same and not args.force:
-        print("You already have this job:")
+        print(ui.paint("You already have this job:", "bold", "yellow"))
         for folder, record, reason in same:
             print(f"   {dedup.describe(folder, record)}  [{reason}]")
         if not confirm("Make another resume for it anyway?"):
@@ -214,7 +230,7 @@ def read_facts(run: Run, offer: Offer) -> JobRecord:
     """The facts of the offer, from the LLM (checked against the text) or patterns,
     then whatever is missing typed by the user."""
     chain = run.chain("extract")
-    print(f"Reading the offer{' with ' + chain[0] if chain else ''} ...")
+    ui.doing(f"Reading the offer{' with ' + chain[0] if chain else ''} ...")
 
     def attempt(llm):
         info, notes = extract(offer.text, llm)
@@ -228,7 +244,7 @@ def read_facts(run: Run, offer: Offer) -> JobRecord:
     info, notes = result if result else extract(offer.text, None)
     extracted_by = list(run.llms)[-1] if result else None      # the last model tried is the one that answered
     for note in notes:
-        print(f"   note: {note}")
+        ui.note(note)
 
     typed = []
     if offer.url:
@@ -254,7 +270,7 @@ def check_repost(record: JobRecord, offer: Offer, args) -> None:
     """Same company and job title as an earlier application: often a repost."""
     similar = dedup.find_similar_job(paths.COMPANIES, record.company, record.job_title, skip=offer.named)
     if similar and not args.force:
-        print("Same company and job title as (a repost?):")
+        print(ui.paint("Same company and job title as (a repost?):", "bold", "yellow"))
         for folder, other in similar:
             print(f"   {dedup.describe(folder, other)}")
         if not confirm("Is this a different job? Continue?"):
@@ -280,7 +296,7 @@ def pick_content(run: Run, bank: dict, offer: str, folder: Path) -> tuple[Select
     result = None
     if chain:
         from ..pick.ai import select as ai_select
-        print(f"Asking {chain[0]} to pick content ...")
+        ui.doing(f"Asking {chain[0]} to pick content ...")
 
         def attempt(llm):
             sel, report = ai_select(bank, offer, default, llm)
@@ -293,10 +309,10 @@ def pick_content(run: Run, bank: dict, offer: str, folder: Path) -> tuple[Select
     if result:
         sel, report = result
         for warning in report.warnings:
-            print(f"   note: {warning}")
+            ui.note(warning)
     else:
         sel, report = keyword_select(bank, offer, default)
-        print(f"Matched keywords ({len(report.found)}): {', '.join(report.found) or 'none'}")
+        print(f"{ui.bold(f'Matched keywords ({len(report.found)}):')} {', '.join(report.found) or 'none'}")
     return sel, report
 
 
@@ -315,7 +331,7 @@ def fit_one_page(bank: dict, sel: Selection, report: MatchReport, folder: Path,
     while not fits():
         gone = shrink(sel, report.bullets)
         if not gone:
-            print("WARN: still longer than one page and nothing left to drop", file=sys.stderr)
+            ui.warn("still longer than one page and nothing left to drop")
             break
         dropped.append(gone)
 
@@ -326,13 +342,13 @@ def fit_one_page(bank: dict, sel: Selection, report: MatchReport, folder: Path,
             label = add(sel, bank, report, candidate)
             if label is None:                     # says the same as a bullet just added
                 continue
-            print(f"   trying {label} ...", end=" ", flush=True)
+            print(ui.dim(f"   trying {label} ..."), end=" ", flush=True)
             if fits():
-                print("fits")
+                print(ui.green("fits"))
                 added.append(label)
                 misses = 0
             else:
-                print("too long")
+                print(ui.yellow("too long"))
                 undo(sel, candidate)
                 misses += 1
                 if misses == MAX_FILL_MISSES:     # page is basically full
