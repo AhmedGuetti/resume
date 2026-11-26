@@ -2,6 +2,7 @@
 
     store.py   write an approved bullet or skill into bank/, and the "no" answers to bank/gaps.md
     draft.py   the LLM turns YOUR answer into a bullet in bank format (it never adds facts)
+    story.py   ... and the story behind it into a cover letter paragraph (bank/letters/)
 
 The interactive part (questions, accept / edit / skip) is app/gaps.py.
 """

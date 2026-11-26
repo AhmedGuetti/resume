@@ -8,7 +8,7 @@ config.yaml at the repo root (copy config.example.yaml):
       score:   deepseek:deepseek-chat    # judge the fit (default: the select model)
       letter:  deepseek:deepseek-chat    # cover letter coach (default: the select model)
       fallback: gemini:gemini-3.6-flash  # only if the first one fails
-    budget:                              # $; when reached, apply uses no AI
+    budget:                              # $; when reached, AI steps stop
       daily: 0.50
       monthly: 5.00
     gemini_thinking: false               # Gemini "thinks" (billed as output) unless off

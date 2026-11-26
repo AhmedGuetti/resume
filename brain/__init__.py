@@ -5,13 +5,14 @@ The packages follow the path of one application:
 
     bank/     the content (bank/*.md) and Selection: what goes on one resume
     offer/    a job offer: its facts (checked against its text), job.json, duplicates
-    pick/     choose the content for an offer (keywords or LLM), fit it on one page
+    pick/     the LLM chooses the content for an offer; fit it on one page
+    compose/  the tailored resume from facts: match (AI), plan (priorities), write (AI), review
     score/    how well you fit the offer, and where you stand among the applicants
     gaps/     gap interview: your answers about missing requirements -> bank bullets you approve
-    render/   selection -> LaTeX -> PDF
+    render/   selection -> data -> PDF (Typst, cv/*.typ)
     letter/   the cover letter coach: four styles, your voice, checks, letter.md -> PDF
     llm/      model backends, fallback chain, spending log and budget
-    app/      what you type: the CLI, the `apply` pipeline, the ninurta> shell
+    app/      what you type: every command (commands.py), the CLI and shell built from it, `apply`
 
     paths.py  where everything lives      config.py  config.yaml      errors.py  error types
 

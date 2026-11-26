@@ -9,9 +9,10 @@ The steps, in order (each one is a function below):
     4. check_repost         same company and same job title as an earlier application?
     5. save_application     cv/company/<name>/ with offer.md and job.json
        offer_language       the language of both documents: --lang, else the offer's
-    6. pick_content         the LLM (or keyword matching) chooses what goes on the page (pick/)
-    7. fit_one_page         drop the weakest bullets, or add the next best, until it fills one page
-    8. write_selection      selection.yaml: what was picked and why, to edit and rebuild by hand
+    6-8. build_resume       composed from your facts (compose/): the AI matches the offer to
+                            your facts, a plan spreads them over your entries, the AI writes
+                            the bullets, the page is fitted, and you review each entry;
+                            selection.yaml and plan.json are written
     9. score_application    fit score, competition (asked to you) and position -> job.json (app/score.py)
        gap_interview        missing requirements: asks you, adds approved bullets to the bank,
                             then redoes 6-9 (app/gaps.py; --no-gaps skips it)
@@ -25,12 +26,10 @@ from __future__ import annotations
 
 import re
 import sys
-import textwrap
 import unicodedata
 from dataclasses import dataclass, field
 from pathlib import Path
 
-import yaml
 
 from .. import paths
 from ..bank import LANGS, Selection, load_bank
@@ -38,24 +37,19 @@ from ..llm import LLM
 from ..llm.fallback import model_chain, run_with_fallback
 from ..offer import dedup
 from ..offer.facts import extract
-from ..offer.parsing import guess_language, guess_source
+from ..offer.parsing import guess_source
 from ..offer.record import JobRecord, to_record
 from ..paths import show
-from ..pick.fit import add, fill_candidates, shrink, undo
-from ..pick.keywords import select as keyword_select
-from ..pick.report import MatchReport
-from ..render.pdf import build_all, pdf_path
+from ..render.pdf import pdf_path
 from . import ui
 from .score import print_score, score_application
 from .summary import print_summary
-from .terminal import ask_link, ask_missing, confirm, print_job, read_pasted_offer
+from .terminal import ask_language, ask_link, ask_missing, confirm, print_job, read_pasted_offer
 
-MAX_FILL_MISSES = 3         # stop filling after this many tries in a row don't fit
 FALLBACK_AFTER_DROPPED = 4  # extract: this many facts not found in the offer -> try the fallback model
-FALLBACK_AFTER_UNKNOWN = 3  # select: this many made-up or malformed ids -> try the fallback model
 
 # Exit codes (see app/cli.py)
-EXIT_BAD_INPUT, EXIT_TOO_LONG, EXIT_ALREADY_APPLIED = 1, 3, 5
+EXIT_BAD_INPUT, EXIT_TOO_LONG, EXIT_NO_MODEL, EXIT_ALREADY_APPLIED = 1, 3, 4, 5
 
 
 class Stop(Exception):
@@ -86,7 +80,7 @@ class Run:
         ui.step(title, self.done, len(self.steps))
 
     def chain(self, task: str) -> list[str]:
-        return model_chain(task, self.args.model, self.args.no_ai)
+        return model_chain(task, self.args.model)
 
     def used(self) -> list[LLM]:
         return [l for l in self.llms.values() if l.usage.calls]
@@ -155,14 +149,14 @@ LANGUAGE_NAME = {"en": "English", "fr": "French"}
 
 
 def offer_language(record: JobRecord, offer: str, forced: str | None = None) -> str:
-    """--lang if given, else the language read from the offer, else a guess from its words.
+    """--lang if given, else the language the model read from the offer, else asked.
     Stored in job.json, so `letter` and `score` use the same one later."""
     if forced:
         lang, why = forced, "--lang"
     elif record.language in LANGS:
         lang, why = record.language, "the offer is written in it"
     else:
-        lang, why = guess_language(offer), "guessed from the offer's words"
+        lang, why = ask_language(), "you chose it"
     record.language = lang
     print(f"{ui.bold('Language:')} {ui.cyan(LANGUAGE_NAME[lang])} {ui.dim(f'({why}; --lang en|fr changes it)')}")
     return lang
@@ -178,9 +172,10 @@ def make_resume(run: Run, record: JobRecord, offer: str, folder: Path, lang: str
         score_application(load_bank(), record, sel, run.chain("score"), run.llms, label=folder.name)
         record.save(folder / "job.json")
         print_score(record)
-        if gap_interview(run, record, folder):
-            ui.doing("Rebuilding the resume with your new bullets ...")
-            n, sel = build_resume(run, record, offer, folder, lang)
+        out = gap_interview(run, record, folder)
+        if out:
+            ui.doing("Rebuilding the resume in the same folder, with your answers on it ...")
+            n, sel = build_resume(run, record, offer, folder, lang, must_use=out.use)
             score_application(load_bank(), record, sel, run.chain("score"), run.llms,
                               label=folder.name, ask=False)
             record.save(folder / "job.json")
@@ -190,35 +185,47 @@ def make_resume(run: Run, record: JobRecord, offer: str, folder: Path, lang: str
     return EXIT_TOO_LONG if n > 1 else 0
 
 
-def build_resume(run: Run, record: JobRecord, offer: str, folder: Path, lang: str) -> tuple[int, Selection]:
-    """Steps 6-8: pick, fit to one page, write selection.yaml. Returns (pages, selection)."""
+def build_resume(run: Run, record: JobRecord, offer: str, folder: Path, lang: str,
+                 must_use: list[str] | None = None) -> tuple[int, Selection]:
+    """Steps 6-8, composed from your facts (brain/compose/): match the offer's requirements
+    to facts, plan, write the bullets, fit one page, then let you review each entry's bullets
+    (unless --no-review, or without a terminal). Writes selection.yaml and plan.json.
+    must_use: facts ("section/entry/fact") and skills ("skill:Name") that go on the page
+    whatever the plan thinks, e.g. what the gap interview just added."""
+    from ..compose.pipeline import NoModel, compose_resume, write_selection
+    from ..compose.facts import load_facts
     bank = load_bank()
-    sel, report = pick_content(run, bank, offer, folder)
-    sel.languages = [lang]                     # `build selection.yaml` rebuilds the same language
-    pages, dropped, added = fit_one_page(bank, sel, report, folder, run.args.no_fill, [lang])
-    write_selection(folder, sel, report, record, run.used(), dropped, added)
-    n = pages[lang]
+    must_use = list(must_use or []) + list(getattr(run.args, "must_use", None) or [])
+    interactive = False if getattr(run.args, "no_review", False) else None
+    try:
+        done = compose_resume(bank, record, lang, folder, run.chain("select"), run.llms, folder.name,
+                              must_use=must_use, interactive=interactive)
+    except NoModel as e:
+        raise Stop(EXIT_NO_MODEL, f"ERROR: {e} (see above). Try again: resume {folder.name}")
+    write_selection(folder, done.sel, done.plan, load_facts(bank), run.used(), done.dropped)
+    n = done.pages
     ui.wrote(show(pdf_path(folder, lang)), f"({n} page{'s' if n > 1 else ''})")
-    return n, sel
+    return n, done.sel
 
 
-def gap_interview(run: Run, record: JobRecord, folder: Path) -> bool:
+def gap_interview(run: Run, record: JobRecord, folder: Path):
     """Offers the gap interview (app/gaps.py) when the offer asks for things the bank lacks.
-    Only in a terminal, with a model, and not with --no-gaps. True if the bank grew."""
+    Only in a terminal, with a model, and not with --no-gaps. Returns its Outcome
+    (falsy when there's nothing to put on the resume), or None."""
     from .gaps import interview, to_ask
     if getattr(run.args, "no_gaps", False) or not sys.stdin.isatty():
-        return False
+        return None
     chain = run.chain("gaps")
     checks = to_ask(record, paths.BANK / "gaps.md")
     if not chain or not checks:
-        return False
+        return None
     n = len(checks)
     if not confirm(f"{n} requirement{'s' if n > 1 else ''} of this offer {'are' if n > 1 else 'is'} "
                    "missing or partial in your bank. Answer a few questions to add them?"):
-        return False
+        return None
     from ..llm import get_llm
     llm = run.llms.setdefault(chain[0], get_llm(chain[0]))
-    return bool(interview(record, llm, folder.name))
+    return interview(record, llm, folder.name)
 
 
 def make_letter(folder: Path, lang: str, args) -> int:
@@ -227,7 +234,7 @@ def make_letter(folder: Path, lang: str, args) -> int:
     from .letter import cmd_letter
     letter_args = argparse.Namespace(
         company=folder.name, style=None, lang=lang, write=False, no_adapt=False, skeleton=False,
-        check=False, build=False, force=False, model=args.model, no_ai=args.no_ai)
+        check=False, build=False, force=False, model=args.model)
     return cmd_letter(letter_args)
 
 
@@ -262,10 +269,10 @@ def check_already_applied(offer: Offer, args) -> None:
 
 
 def read_facts(run: Run, offer: Offer) -> JobRecord:
-    """The facts of the offer, from the LLM (checked against the text) or patterns,
-    then whatever is missing typed by the user."""
+    """The facts of the offer, from the LLM (checked against the text), then whatever
+    is missing typed by the user."""
     chain = run.chain("extract")
-    ui.doing(f"Reading the offer{' with ' + chain[0] if chain else ''} ...")
+    ui.doing(f"Reading the offer with {chain[0]} ...")
 
     def attempt(llm):
         info, notes = extract(offer.text, llm)
@@ -276,8 +283,11 @@ def read_facts(run: Run, offer: Offer) -> JobRecord:
         return (info, notes), None
 
     result = run_with_fallback("extract", chain, attempt, run.llms, label=offer.key or run.args.company)
-    info, notes = result if result else extract(offer.text, None)
-    extracted_by = list(run.llms)[-1] if result else None      # the last model tried is the one that answered
+    if not result:
+        raise Stop(EXIT_NO_MODEL, "ERROR: no model could read the offer (see above). "
+                                  "Try again, or another model: --model provider:model")
+    info, notes = result
+    extracted_by = list(run.llms)[-1]          # the last model tried is the one that answered
     for note in notes:
         ui.note(note)
 
@@ -324,84 +334,3 @@ def save_application(offer: Offer, record: JobRecord, args) -> Path:
 
 
 # ---------- 6-8: the resume ----------
-
-def pick_content(run: Run, bank: dict, offer: str, folder: Path) -> tuple[Selection, MatchReport]:
-    default = Selection.load(paths.DEFAULT_SELECTION)
-    chain = run.chain("select")
-    result = None
-    if chain:
-        from ..pick.ai import select as ai_select
-        ui.doing(f"Asking {chain[0]} to pick content ...")
-
-        def attempt(llm):
-            sel, report = ai_select(bank, offer, default, llm)
-            unknown = [w for w in report.warnings if w.startswith(("unknown", "malformed"))]
-            if len(unknown) >= FALLBACK_AFTER_UNKNOWN:
-                return (sel, report), f"{len(unknown)} made-up ids"
-            return (sel, report), None
-
-        result = run_with_fallback("select", chain, attempt, run.llms, label=folder.name)
-    if result:
-        sel, report = result
-        for warning in report.warnings:
-            ui.note(warning)
-    else:
-        sel, report = keyword_select(bank, offer, default)
-        print(f"{ui.bold(f'Matched keywords ({len(report.found)}):')} {', '.join(report.found) or 'none'}")
-    return sel, report
-
-
-def fit_one_page(bank: dict, sel: Selection, report: MatchReport, folder: Path,
-                 no_fill: bool, langs=LANGS) -> tuple[dict[str, int], list[str], list[str]]:
-    """Builds the PDFs until they fill exactly one page. Returns (pages, dropped, added)."""
-    pages: dict[str, int] = {}
-
-    def fits() -> bool:
-        nonlocal pages
-        pages = build_all(bank, sel, folder, langs)
-        return max(pages.values()) <= 1
-
-    # Too long? Drop the weakest bullets until it fits.
-    dropped = []
-    while not fits():
-        gone = shrink(sel, report.bullets)
-        if not gone:
-            ui.warn("still longer than one page and nothing left to drop")
-            break
-        dropped.append(gone)
-
-    # Room left? Add the next most relevant things while they still fit.
-    added, misses = [], 0
-    if not dropped and not no_fill:
-        for candidate in fill_candidates(bank, sel, report):
-            label = add(sel, bank, report, candidate)
-            if label is None:                     # says the same as a bullet just added
-                continue
-            print(ui.dim(f"   trying {label} ..."), end=" ", flush=True)
-            if fits():
-                print(ui.green("fits"))
-                added.append(label)
-                misses = 0
-            else:
-                print(ui.yellow("too long"))
-                undo(sel, candidate)
-                misses += 1
-                if misses == MAX_FILL_MISSES:     # page is basically full
-                    break
-        if misses:
-            fits()                                # rebuild without the last rejected try
-    return pages, dropped, added
-
-
-def write_selection(folder: Path, sel: Selection, report: MatchReport, record: JobRecord,
-                    used: list[LLM], dropped: list[str], added: list[str]) -> None:
-    why = textwrap.fill(report.why, 86, initial_indent="#   ", subsequent_indent="#   ")
-    header = (f"# Generated by `python -m brain apply` for {record.company}.\n"
-              + ("".join(f"# LLM: {l.usage_line()}\n" for l in used) if used else "# No AI used (keyword matching)\n")
-              + (f"# Why:\n{why}\n" if why else "")
-              + f"# Matched keywords: {', '.join(report.found) or 'none'}\n"
-              + (f"# Dropped to fit one page: {', '.join(dropped)}\n" if dropped else "")
-              + (f"# Added to fill the page: {', '.join(added)}\n" if added else "")
-              + "# Edit freely, then rebuild with: python -m brain build " + show(folder / "selection.yaml") + "\n\n")
-    (folder / "selection.yaml").write_text(
-        header + yaml.safe_dump(sel.to_dict(), sort_keys=False, allow_unicode=True), encoding="utf-8")

@@ -1,4 +1,9 @@
-"""Turn the bank + a selection into the LaTeX source of a resume."""
+"""Turn the bank + a selection into the data the Typst template lays out (cv/resume.typ).
+
+Python resolves everything (ids, languages, dates, bold and code spans); Typst only
+does the layout. Text goes to Typst as plain strings, never as markup, so nothing
+needs escaping.
+"""
 from __future__ import annotations
 
 import re
@@ -11,38 +16,40 @@ SECTION_TITLES = {
     "fr": {"education": "Formation", "experience": "Expérience",
            "projects": "Projets", "skills": "Compétences et centres d'intérêt"},
 }
-BABEL = {"en": "english", "fr": "french"}
 MONTHS = {
     "en": ["Jan.", "Feb.", "Mar.", "Apr.", "May", "June", "July", "Aug.", "Sept.", "Oct.", "Nov.", "Dec."],
     "fr": ["janv.", "févr.", "mars", "avr.", "mai", "juin", "juil.", "août", "sept.", "oct.", "nov.", "déc."],
 }
 PRESENT = {"en": "Present", "fr": "aujourd'hui"}
+NNBSP = " "           # narrow no-break space: French "10 %" never splits
 
 
-# ---------- text -> LaTeX ----------
+# ---------- text ----------
 
-_ESCAPES = {"\\": r"\textbackslash{}", "&": r"\&", "%": r"\%", "$": r"\$", "#": r"\#",
-            "_": r"\_", "{": r"\{", "}": r"\}", "^": r"\^{}", "~": r"$\sim$"}
-
-
-def _escape(s: str) -> str:
-    s = "".join(_ESCAPES.get(c, c) for c in s)
-    s = s.replace(r" \%", r"\,\%")            # French "10 %" -> thin space
-    return re.sub(r"\b(vs|e\.g|i\.e|etc)\. ", r"\1.\\ ", s)   # no sentence space after abbreviations
+Run = list[str]            # [style, text]; style is "" (plain), "b" (bold) or "c" (code)
 
 
-def tex(s: str) -> str:
-    """Inline markdown (**bold**, `code`) + plain text -> LaTeX."""
-    out = []
+def runs(s: str) -> list[Run]:
+    """Inline markdown (**bold**, `code`) -> [[style, text], ...] for the template."""
+    out: list[Run] = []
     for part in re.split(r"(\*\*.+?\*\*|`.+?`)", s):
+        if not part:
+            continue
         if part.startswith("**") and part.endswith("**") and len(part) > 4:
-            out.append(r"\textbf{" + tex(part[2:-2]) + "}")
+            out += [["b", t] for _, t in runs(part[2:-2])]
         elif part.startswith("`") and part.endswith("`") and len(part) > 2:
-            out.append(r"\texttt{" + _escape(part[1:-1]) + "}")
+            out.append(["c", part[1:-1]])
         else:
-            out.append(_escape(part))
-    return "".join(out)
+            out.append(["", re.sub(r" %", NNBSP + "%", part)])
+    return out
 
+
+def plain(s: str) -> str:
+    """The same text without the markdown marks: for places that take no bold."""
+    return "".join(t for _, t in runs(s))
+
+
+# ---------- dates ----------
 
 def _date_parts(value):
     if value is None:
@@ -67,90 +74,76 @@ def _fmt_date(d, lang, with_year=True):
 
 
 def date_range(meta: dict, lang: str) -> str:
+    """'Oct. 2025 – Sept. 2026', 'Apr. – Aug. 2024', 'Apr. 2024', ''."""
     start, end = _date_parts(meta.get("start")), _date_parts(meta.get("end"))
     if start and end and start == end:
-        end = None  # single-month (or single-year) entry: "Apr. 2024", not "Apr. -- Apr. 2024"
+        end = None  # single-month (or single-year) entry: "Apr. 2024", not "Apr. – Apr. 2024"
     if start and end and end != "present" and start[0] == end[0] and start[1] and end[1]:
-        text = f"{_fmt_date(start, lang, with_year=False)} -- {_fmt_date(end, lang)}"
+        text = f"{_fmt_date(start, lang, with_year=False)} – {_fmt_date(end, lang)}"
     elif start and end:
-        text = f"{_fmt_date(start, lang)} -- {_fmt_date(end, lang)}"
+        text = f"{_fmt_date(start, lang)} – {_fmt_date(end, lang)}"
     else:
         text = _fmt_date(end or start, lang) if (end or start) else ""
-    text = text[:1].upper() + text[1:]
-    return text.replace(". ", ".\\ ")
+    return text[:1].upper() + text[1:]
 
 
-# ---------- whole document ----------
+# ---------- the document ----------
 
-def contact_line(p: dict) -> str:
-    """The header's contact block (bank/profile.md), shared by the resume and the cover letter."""
-    line1 = [tex(p["location"]), tex(p["phone"]),
-             rf"\href{{mailto:{p['email']}}}{{{tex(p['email'])}}}"]
+def contact(p: dict) -> dict:
+    """The header (bank/profile.md), shared by the resume and the cover letter:
+    {name, contact: [line1 items, line2 items]}, each item {text, url?}."""
+    line1 = [{"text": p["location"]}, {"text": p["phone"]},
+             {"text": p["email"], "url": f"mailto:{p['email']}"}]
     line2 = []
     for link in p.get("links", []):
-        (line2 if link.get("line", 1) == 2 else line1).append(
-            rf"\href{{{link['url']}}}{{{tex(link['text'])}}}")
-    contact = " \\sep\n   ".join(line1)
-    if line2:
-        contact += "\\\\\n   " + " \\sep\n   ".join(line2)
-    return contact
+        (line2 if link.get("line", 1) == 2 else line1).append({"text": link["text"], "url": link["url"]})
+    return {"name": p["name"], "contact": [line1] + ([line2] if line2 else [])}
 
 
-def render(bank: dict, sel: Selection, lang: str) -> str:
-    p = bank["profile"]
-    contact = contact_line(p)
-
-    out = [r"% Generated by Ninurta (python -m brain) from bank/. Don't edit: change the bank and rebuild.",
-           rf"\documentclass[{BABEL[lang]}]{{resume}}", "", r"\begin{document}", "",
-           rf"\cvheader{{{tex(p['name'])}}}", f"  {{{contact}}}"]
-
+def resume_data(bank: dict, sel: Selection, lang: str) -> dict:
+    sections = []
     for section in sel.sections:
         picks = sel.entries(section)
         if not picks:
             continue
-        out += ["", rf"\section{{{SECTION_TITLES[lang][section]}}}"]
+        title = SECTION_TITLES[lang][section]
         if section == "skills":
-            out += render_skills(bank["skills"], picks, lang)
+            sections.append({"title": title, "kind": "skills", "groups": skill_groups(bank["skills"], picks, lang)})
         else:
-            for pick in picks:
-                out += render_entry(bank[section], section, pick, lang)
-    out += ["", r"\end{document}", ""]
-    return "\n".join(out)
+            sections.append({"title": title, "kind": "entries",
+                             "entries": [entry_data(bank[section], section, p, lang) for p in picks]})
+    name = bank["profile"]["name"]
+    return {"lang": lang, "title": f"{name} – Resume" if lang == "en" else f"{name} – CV",
+            "profile": contact(bank["profile"]), "sections": sections}
 
 
-def render_entry(entries: dict[str, Entry], section: str, pick: EntryPick, lang: str) -> list[str]:
+def entry_data(entries: dict[str, Entry], section: str, pick: EntryPick, lang: str) -> dict:
     eid = pick.id
     if eid not in entries:
         raise BankError(f"{section}: no bank entry '{eid}' (have: {', '.join(entries)})")
     entry = entries[eid]
     meta = {**entry.meta, **{k: getattr(pick, k) for k in ("title", "org", "location")
                              if getattr(pick, k) is not None}}
-    lines = ["\\cventry{" + tex(per_lang(meta["title"], lang)) + "}",
-             "  {" + tex(per_lang(meta["org"], lang)) + "}{" + date_range(meta, lang) + "}{"
-             + tex(per_lang(meta.get("location", ""), lang)) + "}"]
-    bullet_picks = list(entry.bullets) if pick.bullets is None else pick.bullets
-    items = []
-    for b in bullet_picks:
+    bullets = []
+    for b in (list(entry.bullets) if pick.bullets is None else pick.bullets):
         bid = b if isinstance(b, str) else b.id
         if bid not in entry.bullets:
             raise BankError(f"{section}/{eid}: no bullet '{bid}' (have: {', '.join(entry.bullets)})")
         reworded = None if isinstance(b, str) else getattr(b, lang)   # {id: x, en: "reworded", fr: "..."}
-        text = reworded or entry.bullets[bid].text[lang]
-        items.append("  \\item " + tex(text))
-    if items:
-        lines += [r"\begin{itemize}", *items, r"\end{itemize}"]
-    return lines
+        bullets.append(runs(reworded or entry.bullets[bid].text[lang]))
+    return {"org": plain(per_lang(meta["org"], lang)), "title": plain(per_lang(meta["title"], lang)),
+            "dates": date_range(meta, lang), "location": plain(per_lang(meta.get("location", ""), lang)),
+            "bullets": bullets}
 
 
-def render_skills(groups: dict[str, SkillGroup], picks: list[SkillPick], lang: str) -> list[str]:
-    lines = [r"\begin{cvskills}"]
+def skill_groups(groups: dict[str, SkillGroup], picks: list[SkillPick], lang: str) -> list[dict]:
+    out = []
     for pick in picks:
         gid = pick.id
         if gid not in groups:
             raise BankError(f"skills: no group '{gid}' (have: {', '.join(groups)})")
         group = groups[gid]
-        wanted = pick.items
-        if wanted is None:
+        if pick.items is None:
             chosen = group.items
         else:
             by_name = {}
@@ -158,12 +151,12 @@ def render_skills(groups: dict[str, SkillGroup], picks: list[SkillPick], lang: s
                 by_name[item["en"].lower()] = item
                 by_name[item["fr"].lower()] = item
             chosen = []
-            for w in wanted:
+            for w in pick.items:
                 if str(w).lower() not in by_name:
                     raise BankError(f"skills/{gid}: no item '{w}' in skills.md "
                                     f"(have: {', '.join(i['en'] for i in group.items)})")
                 chosen.append(by_name[str(w).lower()])
         label = per_lang(pick.label, lang) if pick.label is not None else group.label[lang]
-        lines.append(f"  \\cvskill{{{tex(label)}}}{{{', '.join(tex(i[lang]) for i in chosen)}}}")
-    lines.append(r"\end{cvskills}")
-    return lines
+        colon = NNBSP + ":" if lang == "fr" else ":"      # French: "Langages : Python"
+        out.append({"label": plain(label) + colon, "items": [plain(i[lang]) for i in chosen]})
+    return out

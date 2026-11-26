@@ -3,8 +3,8 @@ fill in the company, draft the one paragraph that can't be written in advance.
 
 For each slot of the chosen style (styles.yaml `fill:`):
 
-    opener, story, motivation, close   one of your paragraphs, picked for the offer
-                                       (a model, or tag matching without one)
+    opener, story, motivation, close   one of your paragraphs, picked for the offer by
+                                       the model (else the first that fits the style)
     why                                drafted from the offer by the model, marked as
                                        such so you rewrite it; a gap without a model
 
@@ -48,58 +48,36 @@ def text_in(para: LetterParagraph, lang: str) -> str | None:
 
 # ---------- picking ----------
 
-def _offer_words(offer: str) -> str:
-    return " " + " ".join(re.findall(r"[a-zà-ÿ0-9+#.]+", offer.lower())) + " "
-
-
-def keyword_score(para: LetterParagraph, offer: str, evidence_sources: set[str]) -> float:
-    """Tags found in the offer, plus a bonus when the fit score cites this entry as evidence."""
-    low = _offer_words(offer)
-    score = sum(1 for t in para.tags if f" {t.lower().replace('-', ' ')} " in low
-                or f" {t.lower()} " in low)
-    if para.source in evidence_sources:
-        score += 2
-    return score
-
-
-def evidence_sources(record: JobRecord | None) -> set[str]:
-    """Bank entries the fit score used as proof: "experiences/magellan", ..."""
-    folders = {"experience": "experiences", "projects": "projects", "education": "education"}
-    out = set()
-    if record and record.fit:
-        for check in record.fit.requirements:
-            if check.status in ("met", "partial"):
-                for ev in check.evidence:
-                    parts = ev.split("/")
-                    if len(parts) == 3 and parts[0] in folders:
-                        out.add(f"{folders[parts[0]]}/{parts[1]}")
-    return out
-
-
 def candidates(paras: dict[str, LetterParagraph], kind: str, style: Style, lang: str) -> list[LetterParagraph]:
     return [p for p in paras.values() if p.kind == kind and p.fits(style.id) and text_in(p, lang)]
 
 
-def pick_by_keywords(paras: dict[str, LetterParagraph], style: Style, lang: str, offer: str,
-                     record: JobRecord | None) -> dict[str, str]:
-    """{slot: paragraph key}. The opener prefers the same entry as the story."""
-    sources = evidence_sources(record)
-    picks: dict[str, str] = {}
-    story_source = None
-    order = sorted(style.paragraphs, key=lambda p: p.fill != "story")   # story first
-    for para in order:
-        if para.fill == "why":
-            continue
-        options = candidates(paras, para.fill, style, lang)
-        if not options:
-            continue
-        best = max(options, key=lambda p: (keyword_score(p, offer, sources)
-                                           + (1 if story_source and p.source == story_source else 0),
-                                           p.source != "general", p.key))
-        picks[para.id] = best.key
-        if para.fill == "story":
-            story_source = best.source
+def first_picks(paras: dict[str, LetterParagraph], style: Style, lang: str) -> dict[str, str]:
+    """{slot: paragraph key}: the first paragraph that fits each slot, a specific one before
+    a general one. The model's picks replace these; they only fill what it left out."""
+    picks = {}
+    for para in style.paragraphs:
+        options = sorted(candidates(paras, para.fill, style, lang), key=lambda p: p.source == "general")
+        if para.fill != "why" and options:
+            picks[para.id] = options[0].key
     return picks
+
+
+def prefer_stories(picks: dict[str, str], paras: dict[str, LetterParagraph], style: Style,
+                   lang: str, keys: list[str]) -> list[str]:
+    """Put the paragraphs told for this offer (job.json letter_stories, from the gap
+    interview) in their slot, latest first wins. Returns the keys used."""
+    used = []
+    for key in reversed(keys):
+        para = paras.get(key)
+        if para is None or not para.fits(style.id) or not text_in(para, lang):
+            continue
+        slot = next((s for s in style.paragraphs if s.fill == para.kind
+                     and picks.get(s.id) not in used), None)
+        if slot is not None:
+            picks[slot.id] = key
+            used.append(key)
+    return used
 
 
 PICK_SYSTEM = """\
@@ -118,7 +96,7 @@ Answer in JSON: {{"picks": {{"<slot id>": "<paragraph key>", ...}}, "reason": "<
 
 def pick_with_llm(llm, paras: dict[str, LetterParagraph], style: Style, lang: str, offer: str,
                   record: JobRecord | None) -> tuple[dict[str, str], str, list[str]]:
-    """({slot: key}, reason, warnings). Bad picks are dropped (keyword picks fill the gaps)."""
+    """({slot: key}, reason, warnings). Bad picks are dropped (first_picks fill the gaps)."""
     slots = [p for p in style.paragraphs if p.fill != "why"]
     pool = {k: p for k, p in paras.items() if p.fits(style.id) and text_in(p, lang)}
     listing = "\n".join(f"{p.key} | {p.kind} | {', '.join(p.tags)} | {p.text['en'][:160]}"

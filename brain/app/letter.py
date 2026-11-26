@@ -19,15 +19,15 @@ import sys
 
 from .. import paths
 from ..bank import LANGS, load_bank
-from ..errors import LatexError
+from ..errors import RenderError
 from ..letter.coach import (ai_starters, all_bullets, all_skills, company_material, polish,
                             proof_material, top_project)
-from ..letter.assemble import (Slot, adapt, candidates, draft_why, fill_values, pick_by_keywords,
-                               pick_with_llm, translate)
+from ..letter.assemble import (Slot, adapt, candidates, draft_why, fill_values, first_picks,
+                               pick_with_llm, prefer_stories, translate)
 from ..letter.document import Letter, build_letter, letter_path
 from ..letter.paragraphs import en_hash, load_files, load_paragraphs, save_file
 from ..letter.lint import check_letter, check_paragraph, words
-from ..letter.styles import Paragraph, Style, fill, load_styles, suggest_by_keywords, suggest_with_llm
+from ..letter.styles import Paragraph, Style, default_suggestion, fill, load_styles, suggest_with_llm
 from ..letter.voice import QUESTIONS, VOICE_FILE, load_voice, save_voice
 from ..llm import LLM
 from ..llm.fallback import model_chain, run_with_fallback
@@ -258,7 +258,7 @@ def _report(letter: Letter, voice) -> None:
 def _build(letter: Letter, folder) -> int:
     try:
         pdf, pages = build_letter(letter, load_bank()["profile"], folder)
-    except LatexError as e:
+    except RenderError as e:
         ui.error(str(e))
         return 2
     ui.wrote(show(pdf), f"({pages} page{'s' if pages > 1 else ''})")
@@ -337,7 +337,7 @@ def cmd_letter(args) -> int:
             return 0
 
     llms: dict[str, LLM] = {}
-    chain = model_chain("letter", args.model, args.no_ai)
+    chain = model_chain("letter", args.model)
     if args.style:
         suggestion = None
     else:
@@ -345,7 +345,7 @@ def cmd_letter(args) -> int:
         if chain and offer:
             suggestion = run_with_fallback("letter", chain, lambda llm: suggest_with_llm(offer, llm),
                                            llms, label=folder.name)
-        suggestion = suggestion or suggest_by_keywords(offer, lang)
+        suggestion = suggestion or default_suggestion(lang)
 
     paras = load_paragraphs()
     if paras and not args.write and not args.skeleton:
@@ -433,7 +433,7 @@ def assemble_letter(args, folder, record, offer, bank, styles, lang, suggestion,
         style = styles[suggestion.style]
         print(f"Style: {style.name} ({suggestion.reason})")
 
-    picks = pick_by_keywords(paras, style, lang, offer, record)
+    picks = first_picks(paras, style, lang)
     if chain and offer:
         def attempt(llm):
             got, reason, warnings = pick_with_llm(llm, paras, style, lang, offer, record)
@@ -442,6 +442,12 @@ def assemble_letter(args, folder, record, offer, bank, styles, lang, suggestion,
             return got, ("bad picks" if len(warnings) >= 2 else None)
         ui.doing(f"Picking paragraphs with {chain[0]} ...")
         picks.update(run_with_fallback("letter", chain, attempt, llms, label=folder.name) or {})
+    told = record.letter_stories if record else []
+    for key in prefer_stories(picks, paras, style, lang, told):
+        print(ui.dim(f"   using your story from the gap interview: {key}"))
+    missing = [k for k in told if k not in paras]
+    if missing:
+        ui.note(f"stories in job.json no longer in bank/letters/: {', '.join(missing)}")
     if tty:
         picks = review_picks(style, picks, paras, lang)
 
@@ -523,7 +529,7 @@ def cmd_translate(args) -> int:
         print(f"   {p.fr_status():<8} {p.key}")
     if args.dry_run:
         return 0
-    chain = model_chain("letter", args.model, False)
+    chain = model_chain("letter", args.model)
     if not chain:
         print("No model configured: write the French by hand, then `translate --stamp`.", file=sys.stderr)
         return 4

@@ -9,6 +9,12 @@ location: Seclin, France
 start: 2025-10
 end: 2026-09
 tags: [ai, agents, llm, python, qa, api-testing, ci-cd]
+projects:                 # fact id prefix -> project: facts of different projects never share a bullet
+  atas: aTaS
+  bugpredict: BugPredict
+  argus: ARGUS
+  qa: QA testing
+  team: Team practices
 conflicts:                # at most one bullet of each group on a resume (enforced)
   - [overview, overview-three-projects]
   - [overview-three-projects, bugpredict-ownership]

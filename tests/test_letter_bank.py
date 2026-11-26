@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import re
 
-from brain.letter.assemble import (adapt, candidates, draft_why, pick_by_keywords, pick_with_llm,
+from brain.letter.assemble import (adapt, candidates, draft_why, first_picks, pick_with_llm,
                                    translate)
 from brain.letter.lint import check_paragraph
 from brain.letter.paragraphs import KINDS, en_hash, load_file, load_paragraphs, save_file
@@ -65,15 +65,16 @@ fr: >-
 
 # ---------- picking ----------
 
-def test_keyword_picks_follow_the_offer():
-    offer = "We build multi-agent systems with LangGraph; MCP, Jira and evaluation matter to us."
-    direct = pick_by_keywords(PARAS, STYLES["direct"], "en", offer, None)
-    assert direct["proof"].startswith("experiences/magellan/")
-    assert PARAS[direct["close"]].fits("direct")
-    formal = pick_by_keywords(PARAS, STYLES["formal"], "fr", offer, None)
-    assert formal["close"] == "general/close-formal"
-    graphics = pick_by_keywords(PARAS, STYLES["direct"], "en", "Rendering engineer: OpenGL, GLSL, C++, GPU.", None)
-    assert graphics["proof"] in ("education/ut3-master-iafa/story-graphics", "projects/gmath/story-gmath")
+def test_first_picks_fill_every_slot_with_a_fitting_paragraph():
+    for style in (STYLES["direct"], STYLES["formal"]):
+        lang = "fr" if style.id == "formal" else "en"
+        picks = first_picks(PARAS, style, lang)
+        for slot in style.paragraphs:
+            if slot.fill == "why":
+                assert slot.id not in picks
+            elif slot.id in picks:
+                para = PARAS[picks[slot.id]]
+                assert para.kind == slot.fill and para.fits(style.id) and para.text.get(lang)
 
 
 def test_model_picks_are_checked(fake_llm):

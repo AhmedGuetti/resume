@@ -41,7 +41,6 @@ def stub_llms(monkeypatch):
 def test_model_chain(stub_llms):
     assert fallback.model_chain("select") == ["a:1", "b:2"]
     assert fallback.model_chain("select", model="b:2") == ["b:2"]          # no duplicate
-    assert fallback.model_chain("select", no_ai=True) == []
 
 
 def test_first_good_answer_wins(stub_llms):
@@ -73,9 +72,11 @@ def test_budget_reached_stops_before_any_call(stub_llms, monkeypatch):
 # ---------- apply: resume and letter in the offer's language ----------
 
 import argparse
+import json
 
 from brain.app import apply as apply_mod
 from brain.app import letter as letter_mod
+from brain.llm.base import Usage
 from brain.offer.record import JobRecord
 
 FRENCH_OFFER = """Ingénieur IA (H/F) - Acme
@@ -92,10 +93,22 @@ Skills: Python, MCP, experience with agentic systems.
 
 @pytest.fixture
 def applying(tmp_path, monkeypatch):
-    """Runs `apply --no-ai` in a temp cv/company/, with LaTeX and the letter replaced by
-    recorders. Returns the calls: {"resume": [langs per build], "letter": [letter args]}."""
+    """Runs `apply` in a temp cv/company/, with a fake model (it reads the offer's language
+    and writes no bullets), and the PDF build and the
+    letter replaced by recorders. Returns the calls: {"resume": [langs per build], "letter": [letter args]}."""
     monkeypatch.setattr(paths, "COMPANIES", tmp_path / "company")
     calls = {"resume": [], "letter": []}
+
+    class TaskLLM:
+        model_id, label, usage = "fake:1", None, Usage()
+
+        def __init__(self, offer):
+            self.lang = "French" if "Nous" in offer else "English"
+
+        def complete(self, system, user, json_output=False, max_tokens=8192, task=""):
+            if task == "extract":
+                return json.dumps({"language": {"value": self.lang, "quote": ""}})
+            return "{}"
 
     def fake_build_all(bank, sel, out_dir, langs, **kw):
         calls["resume"].append(list(langs))
@@ -105,15 +118,19 @@ def applying(tmp_path, monkeypatch):
         calls["letter"].append(args)
         return 0
 
-    monkeypatch.setattr(apply_mod, "build_all", fake_build_all)
+    from brain.compose import pipeline
+    monkeypatch.setattr(pipeline, "build_all", fake_build_all)
     monkeypatch.setattr(letter_mod, "cmd_letter", fake_letter)
 
     def run(offer_text, **options):
         offer_file = tmp_path / "offer.txt"
         offer_file.write_text(offer_text, encoding="utf-8")
+        monkeypatch.setattr(apply_mod, "model_chain", lambda task, model=None: ["fake:1"])
+        monkeypatch.setattr(fallback, "get_llm", lambda model_id: TaskLLM(offer_text))
+        monkeypatch.setattr(fallback, "over_budget", lambda: None)
         args = argparse.Namespace(company="Acme", offer=str(offer_file), paste=False,
                                   url="https://example.com/job/1", force=True, model=None,
-                                  no_ai=True, no_fill=True, no_score=True, only=None, lang=None)
+                                  no_fill=True, no_score=True, only=None, lang=None)
         vars(args).update(options)
         return apply_mod.cmd_apply(args), calls
     return run

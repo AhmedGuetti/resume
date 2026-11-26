@@ -18,10 +18,9 @@ see the [README](README.md) and the [bank format](bank/README.md).
 
 **Anywhere else**, you need:
 
-- TeX Live with LuaLaTeX and `latexmk`
 - `poppler` (for `pdfinfo` / `pdftotext`)
-- the Source Sans 3 font (optional; without it the build uses TeX Gyre Heros)
-- Python 3.10+ and its packages:
+- the Source Sans 3 font (optional; without it the build uses another sans font)
+- Python 3.12+ and its packages (they include `typst`, the PDF engine: no TeX to install):
 
 ```bash
 pip install -r requirements.txt
@@ -39,7 +38,7 @@ You should see `-> pdf/resume-en.pdf (1 page(s))` and the same for French.
 
 ## 2. Make it yours
 
-All the content lives in `bank/`. You never edit LaTeX.
+All the content lives in `bank/`. The look lives in `cv/*.typ`; you don't need to touch it.
 
 | File | What to put in it |
 |---|---|
@@ -72,7 +71,7 @@ fr: Conception d'un modèle de churn qui a réduit les pertes clients de **12 %*
 
 Tips:
 - **Write more than fits on one page.** The tool picks the best bullets for each offer.
-- **Use tags.** Without AI, tags are how bullets get matched to an offer.
+- **Use tags.** They tell the model what a bullet is about.
 - **Tag `to-confirm`** on anything you haven't double-checked. It will never go on a resume.
 - **Name a shorter version `<id>-short`** (e.g. `churn-model-short`). The tool never puts both versions on the same page.
 - **Group bullets that overlap** under `conflicts:` in the file's front matter (e.g. `- [overview, overview-short-intro]`). At most one of each group goes on a resume.
@@ -92,10 +91,10 @@ make view
 
 ---
 
-## 3. (Optional) Turn on the AI
+## 3. Turn on the AI
 
-Without AI, the tool still works: it matches the offer against your tags and skills.
-With AI, a model reads the offer and picks content much better. It costs a fraction of a cent per offer.
+Tailoring a resume to an offer needs a model: it reads the offer and picks your content.
+It costs a fraction of a cent per offer. (Your main resume, `make`, needs no key.)
 
 ```bash
 cp config.example.yaml config.yaml
@@ -107,7 +106,7 @@ Open `config.yaml` and paste in at least one API key:
 - Google AI Studio: https://aistudio.google.com/apikey (fallback)
 
 `config.yaml` is git-ignored, so your keys never get committed. The `budget:` section caps
-what you can spend per day and per month. Once a limit is reached, the tool keeps working without AI.
+what you can spend per day and per month. Once a limit is reached, `apply` stops until the next day or month.
 
 ---
 
@@ -215,32 +214,30 @@ through each paragraph with questions and ways to start. How to write each part 
 | `list` | all your applications, newest first, with fit score and verdict |
 | `show acme` | the facts saved from that offer, and the score |
 | `score acme` | update the applicant numbers and re-score |
-| `gaps acme` | questions about that offer's missing requirements; your answers become bank bullets you approve |
+| `gaps acme` | questions about that offer's missing requirements; your answers become bank bullets you approve, and your stories cover letter paragraphs |
 | `open acme [fr] [letter]` | open the resume PDF, or the letter |
 | `letter acme` | the cover letter, assembled from your `bank/letters/` paragraphs |
 | `resume acme` | redo just the tailored resume from the saved offer (`--lang en` for the other language) |
+| `review acme` | go through its bullets again, entry by entry: accept, edit, rewrite with a note (`--entry magellan` for one) |
 | `edit acme [letter\|selection\|offer]` | open that file in your editor; `edit bank/letters/general.md` for any file |
 | `letter acme --write` | write it paragraph by paragraph instead, with a coach |
 | `translate` | redo the French of the paragraphs whose English you changed |
 | `letter acme --build` | rebuild the letter after editing `letter.md` |
 | `voice` | answer a few questions so the coach sounds like you |
 | `build acme` | rebuild after editing `selection.yaml` |
-| `main` / `main check` | rebuild your main resume `pdf/resume-*.pdf` (like `make` / `make check`) |
+| `main` / `main --text` | rebuild your main resume `pdf/resume-*.pdf` (like `make`), `--text` also dumps what an ATS reads |
 | `!git status` | run any system command without leaving the shell |
 | `serve` | read-only web page of your applications at http://127.0.0.1:8765 (build it once with `make web`) |
 | `catalog` | every entry, bullet id and skill in your bank |
-| `model off` | no AI for this session (`model config` to undo) |
+| `model deepseek:deepseek-chat` | that model for this session (`model config` to undo) |
 | `cost` / `usage` | what the AI cost this session / today / this month |
+| `today` | the day at a glance: new applications with fit and verdict, bank bullets added, AI cost (`--yesterday`, `--date 2026-11-24`) |
 | `help` | all commands |
 
 Everything also works outside the shell:
 
 ```bash
 python -m brain apply --offer offer.txt
-```
-
-```bash
-python -m brain apply --offer offer.txt --no-ai
 ```
 
 ```bash
@@ -253,13 +250,13 @@ python -m brain --help
 
 | You see | What to do |
 |---|---|
-| `WARN: resume-en is 2 pages` | Drop a bullet in the selection, or use a `-short` version. `make check` warns about this. |
-| `ERROR: LaTeX failed` | The LaTeX log is printed above the error. Usually a missing package or font. |
+| `WARN: resume-en is 2 pages` | Drop a bullet in the selection, or use a `-short` version. |
+| `ERROR: Typst failed` | The message says which line of `cv/*.typ` broke, if you edited a template. |
 | `skills/...: no item 'X'` or `no bullet 'Y'` | A selection names something that isn't in the bank. Check the spelling with `make catalog`. |
 | `experience.0.bulets: Extra inputs are not permitted` | A typo in a selection file. The message says where. |
 | `You already have this job` | Answer `y` to make another one anyway, or pass `--force`. |
-| `No API key for 'deepseek'` | Add the key to `config.yaml`, or run without AI (`model off` / `--no-ai`). |
-| `daily budget reached: ... without AI` | Normal: the budget in `config.yaml` was hit. It falls back to keyword matching. |
+| `No API key for 'deepseek'` | Add the key to `config.yaml`, or pick another model (`model gemini:...` / `--model`). |
+| `daily budget reached: ... skipped` | Normal: the budget in `config.yaml` was hit. Raise it, or wait. |
 
 To check that nothing is broken after changing the code:
 

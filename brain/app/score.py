@@ -1,7 +1,6 @@
 """Scoring an application: the last step of `apply`, and the `score` command.
 
     python -m brain score company-x          # re-score, and update the competition numbers
-    python -m brain score company-x --no-ai  # requirements judged by keyword matching
 
 Re-run it when the applicant count changes: each run keeps a dated snapshot of the
 competition in job.json, and the position verdict follows the latest one.
@@ -45,9 +44,10 @@ def score_application(bank: dict, record: JobRecord, sel: Selection | None, chai
         result = run_with_fallback("score", chain, attempt, llms, label=label)
     if result:
         checks, summary, warnings, by = result
-    else:
-        checks, summary, warnings = check_requirements(bank, reqs, sel, None)
-        by = "keywords"
+    else:                                  # no requirements, or no model answered
+        checks, summary, warnings, by = [], "", [], "nobody"
+        if reqs:
+            ui.warn("no model judged the requirements: the score leaves them out")
     for warning in warnings:
         ui.note(warning)
 
@@ -127,7 +127,7 @@ def cmd_score(args) -> int:
     sel_path = folder / "selection.yaml"
     sel = Selection.load(sel_path) if sel_path.exists() else None
     llms: dict[str, LLM] = {}
-    score_application(load_bank(), record, sel, model_chain("score", args.model, args.no_ai),
+    score_application(load_bank(), record, sel, model_chain("score", args.model),
                       llms, label=folder.name, ask=not args.no_ask)
     record.save(folder / "job.json")
     print_score(record)

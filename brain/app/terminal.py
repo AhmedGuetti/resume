@@ -62,6 +62,17 @@ def confirm(question: str) -> bool:
         return False
 
 
+def ask_language() -> str:
+    """When the model didn't say which language the offer is in. Without a terminal: English."""
+    if not sys.stdin.isatty():
+        return "en"
+    try:
+        answer = input("Which language is the offer in? [en/fr] ").strip().lower()
+    except EOFError:
+        answer = ""
+    return "fr" if answer.startswith("f") else "en"
+
+
 def ask_link(offer: str, given: str | None) -> str | None:
     """The job's link: --url, else one written in the offer, else ask (Enter = none)."""
     url = given or find_url(offer)
