@@ -1,8 +1,8 @@
 """The four letter styles (styles.yaml) and which one suits an offer.
 
-The suggestion is only that: the coach shows it first, you choose. Without a model,
-the offer's words are matched against each style's `cues`; with one, the model
-reads the offer and must quote the words it based its choice on.
+The suggestion is only that: the coach shows it first, you choose. The model reads
+the offer and must quote the words it based its choice on; if no model answers, the
+default is formal for a French offer and direct otherwise.
 """
 from __future__ import annotations
 
@@ -40,7 +40,6 @@ class Style:
     salutation: dict[str, str]
     recipient_default: dict[str, str]
     signoff: dict[str, str]
-    cues: list[str]
     paragraphs: list[Paragraph] = field(default_factory=list)
 
     def words(self) -> tuple[int, int]:
@@ -60,7 +59,7 @@ def load_styles() -> dict[str, Style]:
         styles[sid] = Style(id=sid, name=s["name"], summary=s["summary"], when=s["when"],
                             tone=s["tone"].strip(), salutation=s["salutation"],
                             recipient_default=s["recipient_default"], signoff=s["signoff"],
-                            cues=[c.lower() for c in s.get("cues", [])], paragraphs=paragraphs)
+                            paragraphs=paragraphs)
     return styles
 
 
@@ -75,28 +74,14 @@ def fill(template: str, values: dict[str, str | None]) -> str:
 class Suggestion:
     style: str
     reason: str
-    by: str                           # "keywords" or the model id
-    scores: dict[str, int] = field(default_factory=dict)
+    by: str                           # the model id, or "default"
 
 
-def _cue_hits(text: str, cues: list[str]) -> list[str]:
-    low = text.lower()
-    return [c for c in cues if re.search(rf"(?<!\w){re.escape(c)}(?!\w)", low)]
-
-
-def suggest_by_keywords(offer: str, lang: str) -> Suggestion:
-    styles = load_styles()
-    hits = {sid: _cue_hits(offer, s.cues) for sid, s in styles.items()}
-    scores = {sid: len(h) for sid, h in hits.items()}
+def default_suggestion(lang: str) -> Suggestion:
+    """When no model answers: the safe default for the offer's language."""
     if lang == "fr":
-        scores["formal"] = scores.get("formal", 0) + 1     # French hiring leans formal by default
-    best = max(scores, key=lambda sid: (scores[sid], sid == ("formal" if lang == "fr" else "direct")))
-    if not hits[best]:
-        reason = ("the offer is in French, where the classic letter is the safe default" if best == "formal"
-                  else "nothing in the offer points elsewhere; plain and direct is the safe default")
-    else:
-        reason = "the offer mentions " + ", ".join(f'"{h}"' for h in hits[best][:5])
-    return Suggestion(style=best, reason=reason, by="keywords", scores=scores)
+        return Suggestion("formal", "the offer is in French, where the classic letter is the safe default", "default")
+    return Suggestion("direct", "plain and direct is the safe default", "default")
 
 
 SYSTEM = """\

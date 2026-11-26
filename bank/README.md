@@ -13,10 +13,12 @@ bank/
   selections/default.yaml    the general-purpose resume (pdf/resume-*.pdf)
   letters/                   cover letter paragraphs, one file per entry (see letters/README.md)
   voice.md                   how I write, for the cover letter coach
+  style.md                   how my resume bullets read: the composer follows it
+  approved.yaml              bullets I accepted in reviews, reused when the same facts come up
 ```
 
 This folder is the only place resume content lives: `make` regenerates
-`cv/resume-*.tex` and `pdf/resume-*.pdf` from `selections/default.yaml`.
+`pdf/resume-*.pdf` from `selections/default.yaml`.
 
 The bank holds more than fits on one page. A **selection** file picks what
 goes on a given resume, and `python -m brain` turns it into a PDF.
@@ -46,15 +48,21 @@ en: **BugPredict:** designed a multi-agent bug-detection pipeline with LangGraph
 fr: **BugPredict :** conception d'un pipeline multi-agents de détection de bugs ...
 ```
 
-- Each `## id` is one bullet. The id is how a selection refers to it, so keep it stable.
+- Each `## id` is one fact (and, as written, one bullet of the general resume). Tailored
+  resumes are composed from facts: the AI merges 2-3 facts of the same project into one
+  bullet, in the style of [style.md](style.md). The id is how selections refer to it, so keep
+  it stable. One fact per block: what was done, with what, and the result.
+- `projects:` (optional, front matter) maps an id prefix to a project:
+  `{bugpredict: BugPredict, argus: ARGUS}`. Facts of different projects never share a bullet;
+  a fact matching no prefix is the entry's "general" project; no map = one project.
 - `en:` and `fr:` are both required and must each fit on one line.
 - `tags:` are free-form keywords to help match bullets to a job offer. They never appear on the resume.
 - `conflicts:` (optional) lists groups of bullets that say the same thing. At most one bullet
-  of each group goes on a resume: the keyword pick, the model's pick and the page filling all
+  of each group goes on a resume: the model's pick and the page filling both
   respect it, the model is told about the groups, and `build` warns if a hand-edited
   selection breaks one. Every id must exist in the file. `x` and `x-short` never need a group:
   they always clash.
-- Text is plain Unicode with `**bold**` and `` `code` `` only. Characters like `%`, `&`, `_` and `~` are escaped for LaTeX automatically.
+- Text is plain Unicode with `**bold**` and `` `code` `` only. Any other character (`%`, `&`, `_`, `~`...) is printed as is.
 - Several bullets can describe the same work from different angles (say, one technical and one
   results-focused); a selection picks whichever fits the offer.
 - Anything outside a `## id` block (notes, context) is ignored by the builder.
@@ -114,18 +122,16 @@ job offer (see the main README). To rebuild after editing a selection:
 make tailor SEL=cv/company/acme/selection.yaml
 ```
 
-This writes `tex/resume-<lang>.tex` and `pdf/resume-<lang>.pdf` next to the
-selection file. Useful commands:
+This writes `pdf/resume-<lang>.pdf` next to the selection file. Useful commands:
 
 | Command | What it does |
 |---|---|
 | `make catalog` | list every entry, bullet id, tag and skill |
 | `python -m brain catalog --json` | the whole bank as JSON |
-| `python -m brain build SEL --no-pdf` | check a selection without compiling |
 | `python -m brain build SEL --lang fr` | one language only |
 
 Exit codes: `0` ok, `1` the selection points at something that doesn't exist
-(the message lists what does), `2` LaTeX failed, `3` the PDF is longer than one
+(the message lists what does), `2` the PDF failed to build, `3` the PDF is longer than one
 page, so drop or shorten some bullets and rebuild.
 
 `cv/company/` is git-ignored, so per-application resumes stay local.

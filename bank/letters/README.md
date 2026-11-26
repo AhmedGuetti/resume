@@ -54,5 +54,5 @@ to show the shape. For each one:
    up to date.
 
 Several stories per project are fine (a technical angle, a teamwork angle, a results
-angle): the assembler picks the one closest to the offer. Tags are matched against the
-offer when there's no AI, so put the words an offer would use.
+angle): the model picks the one closest to the offer. Tags help it, so put the words an
+offer would use.

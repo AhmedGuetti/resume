@@ -9,6 +9,9 @@ location: Castres, France
 start: 2025-04
 end: 2025-07
 tags: [nlp, llm, medical, information-extraction, python, fastapi, docker, research, php, javascript]
+projects:                 # fact id prefix -> project: facts of different projects never share a bullet
+  easytalk: EasyTalk
+  easyrmm: EasyRMM
 conflicts:                # at most one bullet of each group on a resume (enforced)
   - [overview, easytalk-pitch-end-to-end]
   - [easytalk-pitch, easytalk-pitch-short, easytalk-pitch-end-to-end]

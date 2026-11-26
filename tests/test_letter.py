@@ -8,7 +8,7 @@ import pytest
 from brain.letter.coach import ai_starters, numbers, polish, proof_material, top_project
 from brain.letter.document import Letter
 from brain.letter.lint import check_letter, check_paragraph
-from brain.letter.styles import fill, load_styles, suggest_by_keywords, suggest_with_llm
+from brain.letter.styles import default_suggestion, fill, load_styles, suggest_with_llm
 from brain.letter.voice import QUESTIONS, Voice, load_voice, save_voice
 
 STYLES = load_styles()
@@ -43,16 +43,10 @@ def test_fill_marks_unknown_values():
     assert fill("At {company}, as {job_title}", {"company": "Acme"}) == "At Acme, as [job_title]"
 
 
-@pytest.mark.parametrize("offer, lang, expected", [
-    ("Early-stage startup, small team, you ship fast with full ownership.", "en", "direct"),
-    ("Nous recherchons un ingénieur pour notre équipe.", "fr", "formal"),
-    ("Join our R&D lab: research on LLM evaluation and benchmark design.", "en", "story"),
-    ("Our mission: better care for patients. Values and community matter here.", "en", "warm"),
-    ("Software engineer, Python.", "en", "direct"),
-])
-def test_style_suggestion_by_keywords(offer, lang, expected):
-    s = suggest_by_keywords(offer, lang)
-    assert s.style == expected and s.reason and s.by == "keywords"
+@pytest.mark.parametrize("lang, expected", [("fr", "formal"), ("en", "direct")])
+def test_default_style_when_no_model_answers(lang, expected):
+    s = default_suggestion(lang)
+    assert s.style == expected and s.reason and s.by == "default"
 
 
 def test_style_suggestion_by_model_must_quote_the_offer(fake_llm):
@@ -149,9 +143,9 @@ Second & last paragraph: 100 % done.
     assert letter.labels[0] == "hook: the match" and letter.labels[1].startswith("proof:")
     assert letter.placeholders() == ["[job title]"]
     assert letter.date_text() == "Lille, le 1er décembre 2026"
-    tex = letter.render({"name": "A B", "location": "Lille", "phone": "0", "email": "a@b.c"})
-    assert r"\documentclass[french]{coverletter}" in tex
-    assert r"Second \& last paragraph: 100\,\% done." in tex and r"\lettersubject{Objet :}" in tex
+    data = letter.data({"name": "A B", "location": "Lille", "phone": "0", "email": "a@b.c"})
+    assert data["lang"] == "fr" and data["subject_label"] == "Objet :"
+    assert data["paragraphs"][1] == [["", "Second & last paragraph: 100\u202f% done."]]
     letter.save(path)
     assert Letter.load(path).paragraphs == letter.paragraphs
 

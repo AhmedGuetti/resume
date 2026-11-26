@@ -1,20 +1,18 @@
 """The end of `apply`: three boxes that sum up the run.
 
     ╭─ The offer ─╮   company, title, place, salary, applicants, language, link
-    ╭─ Scores ────╮   resume ↔ offer (fit), letter ↔ offer (keywords), letter checks, position
+    ╭─ Scores ────╮   resume ↔ offer (fit), letter checks, position
     ╭─ Recap ─────╮   the files made, what it cost, what to do next
 """
 from __future__ import annotations
 
 from pathlib import Path
 
-from ..bank import load_bank
 from ..letter.document import Letter, letter_path
 from ..letter.lint import words
 from ..offer.record import JobRecord
 from ..paths import show
 from ..render.pdf import pdf_path
-from ..score.letter import letter_match
 from ..score.levels import LABELS
 from . import ui
 
@@ -67,18 +65,6 @@ def score_lines(record: JobRecord, letter: Letter | None, offer: str, letter_pro
         lines.append(_row("resume ↔ offer", ui.dim("not enough in the offer to score")))
 
     if letter:
-        text = "\n".join(letter.paragraphs)
-        match = letter_match(load_bank(), offer, record.skills_required, text)
-        detail = []
-        if match.required is not None:
-            detail.append(f"{len(match.required_hit)}/{len(match.required_hit) + len(match.required_missed)} must-haves")
-        if match.keywords is not None:
-            detail.append(f"{len(match.keywords_hit)}/{len(match.keywords_hit) + len(match.keywords_missed)} offer keywords")
-        value = match.score
-        lines.append(_row("letter ↔ offer", f"{ui.bar(None if value is None else value / 100)}  {ui.score(value)}"
-                          + (f"  {ui.dim(', '.join(detail))}" if detail else "")))
-        if match.required_missed:
-            lines.append(_row("", f"{ui.yellow('not in the letter:')} {_short_list(match.required_missed)}"))
         count = len(letter_problems)
         quality = (ui.green("no problems found") if not count
                    else ui.yellow(f"{count} thing{'s' if count > 1 else ''} to look at"))

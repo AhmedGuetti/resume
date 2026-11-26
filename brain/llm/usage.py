@@ -2,7 +2,7 @@
 
 Every LLM call adds one line to cv/company/.usage.jsonl (tokens, estimated $,
 which job it was for). The budget in config.yaml is checked against that log
-before each call; once a limit is reached, `apply` goes on without AI.
+before each call; once a limit is reached, the AI steps stop (`apply` says so).
 """
 from __future__ import annotations
 

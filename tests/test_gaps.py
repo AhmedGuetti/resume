@@ -83,19 +83,39 @@ def test_no_answers_are_remembered_and_matched_on_whole_words(tmp_path):
 # ---------- draft checks ----------
 
 def test_check_draft(bank):
-    d = check_draft(bank, {"entry": "magellan", "id": "QA Cloud!", "tags": ["GCP"], "en": "e", "fr": "f",
+    d = check_draft(bank, {"bullets": [{"entry": "magellan", "id": "QA Cloud!", "tags": ["GCP"],
+                                        "en": "e", "fr": "f"}],
                            "skills": [{"group": "tools", "en": "Python"},          # already in skills
                                       {"group": "tools", "en": "Selenium"},
                                       {"group": "nope", "en": "X"}]})
-    assert (d.section, d.entry, d.id, d.tags) == ("experience", "magellan", "qa-cloud", ["gcp"])
+    b = d.bullets[0]
+    assert (b.section, b.entry, b.id, b.tags) == ("experience", "magellan", "qa-cloud", ["gcp"])
     assert [s.en for s in d.skills] == ["Selenium"]
-    assert d.is_bullet and any("nope" in p for p in d.problems)
+    assert any("nope" in p for p in d.problems)
 
-    assert check_draft(bank, {"entry": "experience/nowhere", "en": "e", "fr": "f"}).problems
-    assert not check_draft(bank, {"entry": "experience/nowhere", "en": "e", "fr": "f"}).is_bullet
+    bad = check_draft(bank, {"bullets": [{"entry": "experience/nowhere", "en": "e", "fr": "f"}]})
+    assert bad.problems and bad.empty
     assert check_draft(bank, {"question": "Which cloud?"}).question == "Which cloud?"
-    assert check_draft(bank, {"covered_by": "experience/magellan/overview"}).covered_by
     assert check_draft(bank, ["not", "an", "object"]).problems
+    old_style = check_draft(bank, {"entry": "experience/magellan", "id": "x", "en": "e", "fr": "f"})
+    assert [b.id for b in old_style.bullets] == ["x"]
+
+
+def test_one_bullet_per_place_and_covered_parts(bank):
+    """Docker at Magellan and at ISIS: two bullets, never one line joining both. A place the
+    bank already covers comes back as covered_by, next to the new bullet for the other."""
+    d = check_draft(bank, {
+        "bullets": [{"entry": "experience/magellan", "id": "docker-k8s", "en": "Magellan line.", "fr": "Ligne."},
+                    {"entry": "experience/isis-champollion", "id": "docker-k8s", "en": "ISIS line.", "fr": "Ligne."},
+                    {"entry": "experience/magellan", "id": "docker-k8s", "en": "Second.", "fr": "Deux."}],
+        "covered_by": ["isis-champollion/easytalk-heideltime", "experience/magellan/no-such-bullet"]})
+    assert [(b.entry, b.id) for b in d.bullets] == [("magellan", "docker-k8s"),
+                                                   ("isis-champollion", "docker-k8s"),
+                                                   ("magellan", "docker-k8s-2")]
+    assert d.covered_by == ["experience/isis-champollion/easytalk-heideltime"]
+    assert any("no-such-bullet" in p for p in d.problems)
+    assert check_draft(bank, {"covered_by": "experience/magellan/overview"}).covered_by == \
+        ["experience/magellan/overview"]
 
 
 def test_draft_sends_the_requirement_and_every_answer(bank, fake_llm):
@@ -140,14 +160,18 @@ def test_interview_no_then_followup_then_accept(bank_dir):
                      ("Kubernetes", "nice", "met"))                         # met: never asked
     llm = ScriptedLLM(
         {"question": "Which GCP services?"},
-        {"entry": "experience/magellan", "id": "atas-vertex", "tags": ["gcp", "cloud"],
-         "en": "Ran the test generator on Vertex AI (GCP).", "fr": "Générateur exécuté sur Vertex AI (GCP)."})
+        {"bullets": [{"entry": "experience/magellan", "id": "atas-vertex", "tags": ["gcp", "cloud"],
+                      "en": "Ran the test generator on Vertex AI (GCP).",
+                      "fr": "Générateur exécuté sur Vertex AI (GCP)."}],
+         "covered_by": ["experience/magellan/argus-gcp"]})
     ask = _script("n", "ALM Octane",                  # req 1: no, remember the keyword
                   "Used GCP at Magellan",             # req 2: answer
                   "Vertex AI",                         #        follow-up
-                  "a")                                 #        accept
-    added = gaps_app.interview(record, llm, "acme", ask=ask, bank_dir=bank_dir)
-    assert added == ["experience/magellan/atas-vertex"]
+                  "a",                                 #        accept
+                  "")                                  #        no story for the letter
+    out = gaps_app.interview(record, llm, "acme", ask=ask, bank_dir=bank_dir)
+    assert out.added == ["experience/magellan/atas-vertex"]
+    assert out.use == ["experience/magellan/atas-vertex", "experience/magellan/argus-gcp"]
     assert declined(bank_dir / "gaps.md") == ["ALM Octane"]
     entry = load_entry(bank_dir / "experiences" / "magellan.md", "experience")
     assert entry.bullets["atas-vertex"].text["fr"].startswith("Générateur")
@@ -158,13 +182,14 @@ def test_interview_no_then_followup_then_accept(bank_dir):
 def test_interview_edit_skip_and_quit(bank_dir):
     record = _record(("Selenium", "required", "missing"), ("Cypress", "required", "partial"),
                      ("Playwright", "nice", "missing"))
-    llm = ScriptedLLM({"entry": "magellan", "id": "qa-selenium", "tags": ["selenium"],
-                       "en": "Draft text.", "fr": "Texte."})
+    llm = ScriptedLLM({"bullets": [{"entry": "magellan", "id": "qa-selenium", "tags": ["selenium"],
+                                    "en": "Draft text.", "fr": "Texte."}]})
     ask = _script("Wrote Selenium tests", "e", "", "Edited English.", "", "", "a",   # edit en, accept
+                  "",                                                              # no story
                   "",                                                              # Cypress: skip
                   "q")                                                             # stop
-    added = gaps_app.interview(record, llm, "acme", ask=ask, bank_dir=bank_dir)
-    assert added == ["experience/magellan/qa-selenium"]
+    out = gaps_app.interview(record, llm, "acme", ask=ask, bank_dir=bank_dir)
+    assert out.added == ["experience/magellan/qa-selenium"]
     entry = load_entry(bank_dir / "experiences" / "magellan.md", "experience")
     assert entry.bullets["qa-selenium"].text["en"] == "Edited English."
     assert len(llm.calls) == 1                          # editing doesn't call the model again
@@ -174,3 +199,111 @@ def test_gaps_order_missing_required_first():
     record = _record(("a", "nice", "partial"), ("b", "required", "partial"),
                      ("c", "nice", "missing"), ("d", "required", "missing"))
     assert [c.text for c in gaps_app.gaps_of(record)] == ["d", "b", "c", "a"]
+
+
+def test_interview_two_places_drop_one(bank_dir):
+    (bank_dir / "experiences" / "isis-champollion.md").write_text(
+        (BANK / "experiences" / "isis-champollion.md").read_text())
+    record = _record(("Docker, Kubernetes", "required", "partial"))
+    llm = ScriptedLLM({"bullets": [
+        {"entry": "experience/magellan", "id": "docker-agents", "en": "Magellan Docker.", "fr": "Docker M."},
+        {"entry": "experience/isis-champollion", "id": "easytalk-k8s", "en": "ISIS K8s.", "fr": "K8s I."}]})
+    ask = _script("Docker at Magellan, Kubernetes at ISIS", "d2", "a", "")
+    out = gaps_app.interview(record, llm, "acme", ask=ask, bank_dir=bank_dir)
+    assert out.added == ["experience/magellan/docker-agents"]
+    assert "easytalk-k8s" not in (bank_dir / "experiences" / "isis-champollion.md").read_text()
+
+
+# ---------- the rebuilt resume shows what the interview gave ----------
+
+def test_interview_answers_are_must_use_facts_of_the_plan(bank, default_sel):
+    """What the interview added (apply's must_use) is planned on the page whatever the match says."""
+    from brain.compose.facts import load_facts
+    from brain.compose.match import Match
+    from brain.compose.plan import make_plan
+    facts = load_facts(bank)
+    plan = make_plan(bank, facts, Match([]), default_sel,
+                     must_use=["experience/isis-champollion/easyrmm-errors", "skill:Pydantic",
+                               "experience/magellan/nope"])
+    isis = plan.entry("experience/isis-champollion")
+    assert isis.pool[0].key == "experience/isis-champollion/easyrmm-errors" and isis.pool[0].must
+    group = next(gid for gid, g in bank["skills"].items() if "Pydantic" in [i["en"] for i in g.items])
+    assert plan.skills[group][0] == "Pydantic"
+
+
+# ---------- the story behind it, for the cover letter ----------
+
+STORY_EN = ("Testers at Magellan lost an afternoon each sprint re-running the same Selenium suite by "
+            "hand. I wrote a small runner that started it on every merge and posted the failures in "
+            "their channel. After two weeks, nobody ran it by hand anymore.")
+STORY_FR = ("Chez Magellan, les testeurs perdaient un après-midi par sprint à relancer la même suite "
+            "Selenium à la main. J'ai écrit un petit outil qui la lançait à chaque fusion et publiait "
+            "les échecs dans leur canal. Au bout de deux semaines, plus personne ne la lançait à la main.")
+
+
+def test_check_story_keeps_the_entry_and_flags_made_up_numbers():
+    from brain.gaps.story import check_story
+    entries = [("experience", "magellan")]
+    s = check_story({"entry": "experience/elsewhere", "id": "Selenium runner", "tags": ["Selenium"],
+                     "en": STORY_EN + " It saved 40 hours.", "fr": STORY_FR},
+                    entries, said="Selenium at Magellan, two weeks", facts="")
+    assert (s.section, s.entry, s.id, s.tags) == ("experience", "magellan", "story-selenium-runner",
+                                                  ["selenium"])
+    assert any("elsewhere" in n for n in s.notes)
+    assert any("40" in n for n in s.notes)              # a number the candidate never gave
+    assert check_story({"question": "What changed after?"}, entries, "", "").question
+    assert check_story({"entry": "magellan", "en": "x"}, entries, "", "").empty
+
+
+def test_interview_story_goes_to_bank_letters_and_job_json(bank_dir):
+    from brain.letter.paragraphs import load_file
+    record = _record(("Selenium", "required", "missing"))
+    llm = ScriptedLLM(
+        {"bullets": [{"entry": "magellan", "id": "qa-selenium", "tags": ["selenium"],
+                      "en": "Automated the Selenium suite.", "fr": "Automatisation de la suite Selenium."}]},
+        {"question": "What changed for the testers?"},
+        {"entry": "experience/magellan", "id": "story-selenium", "tags": ["selenium", "ci"],
+         "en": STORY_EN, "fr": STORY_FR})
+    ask = _script("Selenium at Magellan", "a",                       # bullet accepted
+                  "They re-ran the suite by hand, I automated it",   # the story
+                  "After two weeks nobody ran it by hand",           # its follow-up
+                  "a")                                               # paragraph accepted
+    out = gaps_app.interview(record, llm, "acme", ask=ask, bank_dir=bank_dir)
+    assert out.stories == ["experiences/magellan/story-selenium"]
+    assert record.letter_stories == out.stories
+    path = bank_dir / "letters" / "experiences" / "magellan.md"
+    para = {p.id: p for p in load_file(path, bank_dir / "letters").paragraphs}["story-selenium"]
+    assert para.kind == "story" and para.by == "me" and para.fr_status() == "ok"
+    assert para.text["en"] == STORY_EN
+    assert "nobody ran it by hand" in llm.calls[2]      # the follow-up went into the redraft
+    assert not (BANK / "letters" / "experiences" / "magellan.md").read_text().count("story-selenium")
+
+
+def test_add_story_picks_a_free_id_and_never_breaks_the_file(bank_dir):
+    from brain.gaps.story import StoryDraft, add_story
+    letters = bank_dir / "letters"
+    (letters / "experiences").mkdir(parents=True)
+    shutil.copy(BANK / "letters" / "experiences" / "magellan.md", letters / "experiences" / "magellan.md")
+    story = StoryDraft(section="experience", entry="magellan", id="story-bugpredict", tags=["qa"],
+                       en=STORY_EN, fr=STORY_FR)
+    assert add_story(letters, story) == "experiences/magellan/story-bugpredict-2"   # taken
+    path = letters / "experiences" / "magellan.md"
+    before = path.read_text()
+    with pytest.raises(BankError):
+        add_story(letters, story.model_copy(update={"tags": ["a: [b"]}))            # broken YAML
+    assert path.read_text() == before
+
+
+def test_letter_prefers_the_story_told_for_this_offer():
+    from brain.letter.assemble import prefer_stories
+    from brain.letter.paragraphs import LetterParagraph
+    from brain.letter.styles import load_styles
+    style = load_styles()["direct"]
+    story_slot = next(s.id for s in style.paragraphs if s.fill == "story")
+    told = LetterParagraph(id="story-x", source="experiences/magellan", kind="story",
+                           text={"en": "Told."})
+    paras = {told.key: told}
+    picks = {story_slot: "experiences/magellan/story-bugpredict"}
+    assert prefer_stories(picks, paras, style, "en", [told.key, "gone/story"]) == [told.key]
+    assert picks[story_slot] == told.key
+    assert prefer_stories(picks, paras, style, "fr", [told.key]) == []   # no French text: not used

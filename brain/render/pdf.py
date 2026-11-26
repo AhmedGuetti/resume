@@ -1,26 +1,25 @@
-"""Write the .tex for a selection and compile it to PDF with latexmk.
+"""Compile a document's data into a PDF with Typst (cv/resume.typ, cv/letter.typ).
 
-An output folder looks like this (a tailored resume, or build/selections/<name>/):
+Typst runs in-process (the `typst` Python package): no TeX install, and a page
+builds in a fraction of a second, which keeps the one-page fitting loop fast.
 
-    tex/resume-en.tex   the LaTeX source (LaTeX's own temporary files go in tex/.build/)
-    pdf/resume-en.pdf   the result
+    pdf/resume-en.pdf   what an output folder gets (a tailored resume, or build/selections/<name>/)
 """
 from __future__ import annotations
 
+import json
 import re
-import shutil
 import subprocess
-import sys
 from pathlib import Path
 
+import typst
+
 from ..bank import Selection
-from ..errors import LatexError
-from ..paths import ROOT, show
-from .latex import render
+from ..errors import RenderError
+from ..paths import ROOT
+from .resume import resume_data
 
-
-def tex_dir(out_dir: Path) -> Path:
-    return out_dir / "tex"
+TEMPLATES = ROOT / "cv"
 
 
 def pdf_dir(out_dir: Path) -> Path:
@@ -31,45 +30,24 @@ def pdf_path(out_dir: Path, lang: str) -> Path:
     return pdf_dir(out_dir) / f"resume-{lang}.pdf"
 
 
-def build_all(bank: dict, sel: Selection, out_dir: Path, langs, pdf: bool = True,
-              tex_out: Path | None = None) -> dict[str, int]:
-    """Write every language's .tex into out_dir/tex/ (or tex_out) and compile it into
-    out_dir/pdf/. Returns {lang: pages}; pages is 0 with pdf=False."""
-    pages = {}
-    for lang in langs:
-        tex_path = write_tex(bank, sel, lang, tex_out or tex_dir(out_dir))
-        if pdf:
-            _, pages[lang] = compile_pdf(tex_path, pdf_dir(out_dir))
-        else:
-            pages[lang] = 0
-            print(f"-> {show(tex_path)}")
-    return pages
+def build_all(bank: dict, sel: Selection, out_dir: Path, langs) -> dict[str, int]:
+    """Build every language's resume into out_dir/pdf/. Returns {lang: pages}."""
+    return {lang: compile_pdf("resume", resume_data(bank, sel, lang), pdf_path(out_dir, lang))
+            for lang in langs}
 
 
-def write_tex(bank: dict, sel: Selection, lang: str, tex_dir: Path) -> Path:
-    tex_dir.mkdir(parents=True, exist_ok=True)
-    tex_path = tex_dir / f"resume-{lang}.tex"
-    tex_path.write_text(render(bank, sel, lang), encoding="utf-8")
-    return tex_path
-
-
-def compile_pdf(tex_path: Path, pdf_dir: Path) -> tuple[Path, int]:
-    """Compile tex_path into pdf_dir (LaTeX's aux files go in .build/ next to the .tex).
-    Returns (pdf, page count)."""
-    aux = tex_path.parent / ".build"
-    cmd = ["latexmk", f"-outdir={aux}", f"-auxdir={aux}", str(tex_path)]
-    res = subprocess.run(cmd, cwd=ROOT, capture_output=True, text=True)   # cwd: picks up .latexmkrc
-    pdf = aux / f"{tex_path.stem}.pdf"
-    if res.returncode != 0 or not pdf.exists():
-        sys.stderr.write(res.stdout[-3000:] + res.stderr[-2000:])
-        raise LatexError(f"LaTeX failed for {tex_path}")
-    pdf_dir.mkdir(parents=True, exist_ok=True)
-    final = pdf_dir / pdf.name
-    shutil.copy(pdf, final)
-    return final, page_count(final)
+def compile_pdf(template: str, data: dict, out: Path) -> int:
+    """cv/<template>.typ + data -> out (PDF). Returns the page count."""
+    try:
+        pdf = typst.compile(str(TEMPLATES / f"{template}.typ"), root=str(ROOT),
+                            sys_inputs={"data": json.dumps(data, ensure_ascii=False)})
+    except Exception as e:                    # typst raises its own error types
+        raise RenderError(f"Typst failed for {template}: {e}") from e
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_bytes(pdf)
+    return page_count(out)
 
 
 def page_count(pdf: Path) -> int:
     info = subprocess.run(["pdfinfo", str(pdf)], capture_output=True, text=True).stdout
     return int(re.search(r"^Pages:\s+(\d+)", info, re.M).group(1))
-
