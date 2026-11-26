@@ -8,8 +8,8 @@ class BankError(Exception):
     """Bad content: a bank file or a selection refers to something that doesn't exist."""
 
 
-class LatexError(Exception):
-    """LaTeX could not build the PDF."""
+class RenderError(Exception):
+    """Typst could not build the PDF."""
 
 
 def explain(error: ValidationError) -> str:

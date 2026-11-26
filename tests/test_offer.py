@@ -102,15 +102,14 @@ def test_extract_keeps_only_facts_quoted_from_the_offer(fake_llm):
     assert info["applicants"] == "Over 100 applicants"
 
 
-def test_extract_without_llm_only_uses_patterns():
-    info, notes = extract(OFFER, None)
-    assert info["company"] is None and info["skills_required"] == []
-    assert info["posted"] and info["applicants"]
-    assert notes == []
+def test_extract_keeps_the_language_unknown_when_the_model_does_not_say(fake_llm):
+    info, _ = extract(OFFER, fake_llm({"facts": {}, "lists": {}}))
+    assert info["language"] is None              # apply asks for it
+    assert info["posted"] and info["applicants"]  # patterns still read these
 
 
-def test_to_record_parses_numbers_next_to_the_raw_text():
-    info, _ = extract(OFFER, None)
+def test_to_record_parses_numbers_next_to_the_raw_text(fake_llm):
+    info, _ = extract(OFFER, fake_llm({"facts": {}, "lists": {}}))
     info["salary"] = "45-55k€ per year"
     record = to_record(info, offer_file="offer.md", user_fields=["salary"], notes=[],
                        model=None, source="linkedin")
@@ -139,7 +138,7 @@ def test_extract_survives_malformed_answer(fake_llm):
 
 # ---------- language ----------
 
-from brain.offer.parsing import guess_language, normalize_language
+from brain.offer.parsing import normalize_language
 
 
 @pytest.mark.parametrize("value, code", [
@@ -151,25 +150,8 @@ def test_normalize_language(value, code):
     assert normalize_language(value) == code
 
 
-@pytest.mark.parametrize("text, code", [
-    ("Nous recherchons un ingénieur IA pour rejoindre notre équipe. Vos missions : "
-     "concevoir des agents et les mettre en production avec les équipes métier.", "fr"),
-    ("We are looking for an AI engineer to join our team. You will design agents "
-     "and ship them to production with the business teams.", "en"),
-    ("", "en"),
-])
-def test_guess_language(text, code):
-    assert guess_language(text) == code
-
-
-def test_extract_always_sets_the_language_even_without_a_model():
-    info, _ = extract("Poste : ingénieur IA. Vous rejoindrez notre équipe à Lille pour "
-                      "développer des agents avec les équipes de test.", None)
-    assert info["language"] == "fr"
-
-
 def test_extract_normalizes_the_models_language(fake_llm):
     offer = "We are hiring an AI engineer in Lille to build agents for the QA team."
-    llm = fake_llm({"facts": {"language": {"value": "English", "quote": ""}}, "lists": {}})
+    llm = fake_llm({"language": {"value": "English", "quote": ""}})
     info, _ = extract(offer, llm)
     assert info["language"] == "en"

@@ -105,13 +105,19 @@ def test_unconfirmed_and_twin_bullets_are_refused(bank, default_sel, fake_llm):
     assert "to-confirm" in w and "says the same as" in w
 
 
-def test_model_picks_outrank_keyword_scores(bank, default_sel, fake_llm):
-    eid, bullets = _pick(bank, "experience", 2)
-    llm = fake_llm({"experience": [{"id": eid, "bullets": bullets}],
-                    "education": [], "projects": [], "skills": [], "why": ""})
-    _, report = select(bank, OFFER, default_sel, llm)
+def test_model_picks_rank_first_then_its_spares(bank, default_sel, fake_llm):
+    eid, bullets = _pick(bank, "experience", 3)
+    llm = fake_llm({"experience": [{"id": eid, "bullets": bullets[:2]}],
+                    "education": [], "projects": [], "skills": [], "why": "",
+                    "spare": [f"experience/{eid}/{bullets[2]}", "experience/nope/x"]})
+    sel, report = select(bank, OFFER, default_sel, llm)
     assert report.bullets[("experience", eid, bullets[0])] == 100
     assert report.bullets[("experience", eid, bullets[1])] == 99
+    assert report.bullets[("experience", eid, bullets[2])] == 50       # added first if there's room
+    assert any("unknown spare" in w for w in report.warnings)
+    others = [e.id for e in sel.experience if e.id != eid]              # skipped: the general resume's
+    for other in others:
+        assert sel.entry("experience", other).bullets == default_sel.entry("experience", other).bullets
 
 
 def test_bank_is_in_system_prompt_and_offer_in_user(bank, default_sel, fake_llm):

@@ -1,5 +1,5 @@
 """From a selection to the finished resume.
 
-    latex.py  selection + bank -> LaTeX source (escaping, dates, sections)
-    pdf.py    LaTeX -> PDF with latexmk, page count, output folder layout
+    resume.py  selection + bank -> the data cv/resume.typ lays out (dates, sections, bold)
+    pdf.py     data -> PDF with Typst, page count, output folder layout
 """

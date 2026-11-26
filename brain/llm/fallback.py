@@ -3,7 +3,7 @@
 Each job (extract the offer's facts, select the content) has a chain of models:
 the configured one (or --model), then the fallback. `run_with_fallback` tries them
 in order until one gives a good answer, and gives up (returns None) as soon as the
-budget is reached: the caller then goes on without AI.
+budget is reached: the caller then stops, or skips that step.
 """
 from __future__ import annotations
 
@@ -18,10 +18,8 @@ T = TypeVar("T")
 Attempt = Callable[[LLM], "tuple[T | None, str | None]"]
 
 
-def model_chain(task: str, model: str | None = None, no_ai: bool = False) -> list[str]:
+def model_chain(task: str, model: str | None = None) -> list[str]:
     """Models to try for a task, in order: `model` (or the configured one), then the fallback."""
-    if no_ai:
-        return []
     models = task_models()
     chain = [model or models[task], models["fallback"]]
     return [m for i, m in enumerate(chain) if m and m not in chain[:i]]
@@ -35,7 +33,7 @@ def run_with_fallback(task: str, chain: list[str], attempt: Attempt, llms: dict[
     for i, model_id in enumerate(chain):
         reason = over_budget()
         if reason:
-            print(f"   {reason}: {task} without AI")
+            print(f"   {reason}: {task} skipped")
             return None
         if model_id not in llms:
             llms[model_id] = get_llm(model_id)

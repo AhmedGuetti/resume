@@ -5,13 +5,12 @@ from pathlib import Path
 
 import pytest
 
-from brain.app.cli import cmd_build
+from brain.app.commands import cmd_build
 from brain.bank import BankError, Selection
 from brain.bank.loader import Entry, load_entry
 from brain.paths import DEFAULT_SELECTION
 from brain.pick.fit import add, fill_candidates
-from brain.pick.keywords import select as keyword_select
-from brain.pick.report import BulletKey
+from brain.pick.report import BulletKey, MatchReport
 
 BULLETS = "".join(f"## {b}\ntags: x\nen: {b} text\nfr: {b} texte\n\n"
                   for b in ("pitch", "pitch-short", "refactor", "results", "results-short", "other"))
@@ -56,19 +55,16 @@ def test_the_default_resume_has_no_clash(bank):
     assert Selection.load(DEFAULT_SELECTION).clashes(bank) == []
 
 
-OFFERS = [
-    "AI engineer: LLM agents, LangGraph, MCP, evaluation, CI/CD, Python, QA automation.",
-    "Ingénieur TAL : NLP, extraction d'information, textes médicaux, FastAPI, Docker, recherche.",
-    "Full-stack developer: PHP, JavaScript, jQuery, refactoring legacy code, error handling, web.",
-    "Research intern: low-resource NLP, machine translation, POS tagging, AWK, Python, linguistics.",
-    "Graphics engineer: OpenGL, GLSL, C++, rendering, GPU, animation, geometry, computer vision.",
-]
+def everything(bank) -> MatchReport:
+    """A report that would add every bullet and project of the bank."""
+    return MatchReport(bullets={BulletKey(sec, eid, bid): 1 for sec in ("experience", "education", "projects")
+                                for eid, e in bank[sec].items() for bid in e.bullets},
+                       projects={pid: 1 for pid in bank["projects"]})
 
 
-@pytest.mark.parametrize("offer", OFFERS)
-def test_keyword_picks_and_page_filling_never_clash(bank, default_sel, offer):
-    sel, report = keyword_select(bank, offer, default_sel)
-    assert sel.clashes(bank) == []
+def test_page_filling_never_clashes(bank, default_sel):
+    sel = Selection.from_dict(default_sel.to_dict())
+    report = everything(bank)
     for candidate in fill_candidates(bank, sel, report):    # add everything that's allowed
         add(sel, bank, report, candidate)
     assert sel.clashes(bank) == []
@@ -77,7 +73,7 @@ def test_keyword_picks_and_page_filling_never_clash(bank, default_sel, offer):
 def test_add_refuses_a_bullet_that_clashes_with_one_added_since(bank, default_sel):
     eid, entry = next((eid, e) for eid, e in bank["experience"].items() if e.conflicts)
     a, b = sorted(next(iter(entry.conflicts)))[:2]
-    sel, report = keyword_select(bank, "nothing relevant", default_sel)
+    sel, report = Selection.from_dict(default_sel.to_dict()), everything(bank)
     sel.entry("experience", eid).bullets = [x for x in entry.bullets
                                             if not entry.clash(x, [a, b]) and x not in (a, b)][:1]
     assert add(sel, bank, report, BulletKey("experience", eid, a)) is not None
@@ -92,7 +88,6 @@ def test_build_warns_about_a_hand_edited_clash(bank, tmp_path, capsys):
     sel_file = tmp_path / "selection.yaml"
     sel_file.write_text(f"sections: [experience]\nexperience:\n  - id: {eid}\n    bullets: [{a}, {b}]\n",
                         encoding="utf-8")
-    cmd_build(argparse.Namespace(selection=str(sel_file), lang="en", out=str(tmp_path),
-                                 tex_dir=None, no_pdf=True))
+    cmd_build(argparse.Namespace(selection=str(sel_file), lang="en", out=str(tmp_path)))
     err = capsys.readouterr().err
     assert f"experience/{eid}: {a} and {b}" in err and "WARN" in err

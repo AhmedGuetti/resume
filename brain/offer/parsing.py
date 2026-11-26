@@ -5,7 +5,6 @@
     parse_applicants("Over 100 ...")    -> {count: 100, at_least: True}
     parse_salary("45-55k€ per year")    -> {min: 45000, max: 55000, currency: "EUR", period: "year"}
     guess_source(offer, url)            -> "linkedin", "indeed", ...
-    guess_language(offer)               -> "fr" or "en"
     normalize_language("French")        -> "fr"
 """
 from __future__ import annotations
@@ -128,14 +127,6 @@ LANGUAGE_NAMES = {
     "en": ("en", "english", "anglais", "en-us", "en-gb", "en_us", "en_gb"),
 }
 
-# Short words that are common in one language and rare in the other.
-FRENCH_WORDS = frozenset("""le la les des du une est et en pour avec dans sur nous vous vos notre
-    nos sont être ou au aux ce cette qui que par pas plus votre poste profil missions
-    compétences expérience entreprise équipe""".split())
-ENGLISH_WORDS = frozenset("""the and of to is are for with in on our we you your will be or as
-    this that by an at role team experience skills job about who what work""".split())
-
-
 def normalize_language(value) -> str | None:
     """'French', 'fr-FR', 'français' -> 'fr'. None when it isn't French or English."""
     if not value:
@@ -145,11 +136,3 @@ def normalize_language(value) -> str | None:
         if v in names or v.split("-")[0].split("_")[0] == code:
             return code
     return None
-
-
-def guess_language(text: str) -> str:
-    """'fr' or 'en', by counting common short words. Ties (or no text) go to English."""
-    words = re.findall(r"[a-zàâçéèêëîïôûùüÿœ]+", text.lower())
-    fr = sum(w in FRENCH_WORDS for w in words)
-    en = sum(w in ENGLISH_WORDS for w in words)
-    return "fr" if fr > en else "en"

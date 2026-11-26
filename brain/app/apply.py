@@ -9,7 +9,7 @@ The steps, in order (each one is a function below):
     4. check_repost         same company and same job title as an earlier application?
     5. save_application     cv/company/<name>/ with offer.md and job.json
        offer_language       the language of both documents: --lang, else the offer's
-    6. pick_content         the LLM (or keyword matching) chooses what goes on the page (pick/)
+    6. pick_content         the LLM chooses what goes on the page (pick/)
     7. fit_one_page         drop the weakest bullets, or add the next best, until it fills one page
     8. write_selection      selection.yaml: what was picked and why, to edit and rebuild by hand
     9. score_application    fit score, competition (asked to you) and position -> job.json (app/score.py)
@@ -38,24 +38,23 @@ from ..llm import LLM
 from ..llm.fallback import model_chain, run_with_fallback
 from ..offer import dedup
 from ..offer.facts import extract
-from ..offer.parsing import guess_language, guess_source
+from ..offer.parsing import guess_source
 from ..offer.record import JobRecord, to_record
 from ..paths import show
 from ..pick.fit import add, fill_candidates, shrink, undo
-from ..pick.keywords import select as keyword_select
 from ..pick.report import MatchReport
 from ..render.pdf import build_all, pdf_path
 from . import ui
 from .score import print_score, score_application
 from .summary import print_summary
-from .terminal import ask_link, ask_missing, confirm, print_job, read_pasted_offer
+from .terminal import ask_language, ask_link, ask_missing, confirm, print_job, read_pasted_offer
 
 MAX_FILL_MISSES = 3         # stop filling after this many tries in a row don't fit
 FALLBACK_AFTER_DROPPED = 4  # extract: this many facts not found in the offer -> try the fallback model
 FALLBACK_AFTER_UNKNOWN = 3  # select: this many made-up or malformed ids -> try the fallback model
 
 # Exit codes (see app/cli.py)
-EXIT_BAD_INPUT, EXIT_TOO_LONG, EXIT_ALREADY_APPLIED = 1, 3, 5
+EXIT_BAD_INPUT, EXIT_TOO_LONG, EXIT_NO_MODEL, EXIT_ALREADY_APPLIED = 1, 3, 4, 5
 
 
 class Stop(Exception):
@@ -86,7 +85,7 @@ class Run:
         ui.step(title, self.done, len(self.steps))
 
     def chain(self, task: str) -> list[str]:
-        return model_chain(task, self.args.model, self.args.no_ai)
+        return model_chain(task, self.args.model)
 
     def used(self) -> list[LLM]:
         return [l for l in self.llms.values() if l.usage.calls]
@@ -155,14 +154,14 @@ LANGUAGE_NAME = {"en": "English", "fr": "French"}
 
 
 def offer_language(record: JobRecord, offer: str, forced: str | None = None) -> str:
-    """--lang if given, else the language read from the offer, else a guess from its words.
+    """--lang if given, else the language the model read from the offer, else asked.
     Stored in job.json, so `letter` and `score` use the same one later."""
     if forced:
         lang, why = forced, "--lang"
     elif record.language in LANGS:
         lang, why = record.language, "the offer is written in it"
     else:
-        lang, why = guess_language(offer), "guessed from the offer's words"
+        lang, why = ask_language(), "you chose it"
     record.language = lang
     print(f"{ui.bold('Language:')} {ui.cyan(LANGUAGE_NAME[lang])} {ui.dim(f'({why}; --lang en|fr changes it)')}")
     return lang
@@ -227,7 +226,7 @@ def make_letter(folder: Path, lang: str, args) -> int:
     from .letter import cmd_letter
     letter_args = argparse.Namespace(
         company=folder.name, style=None, lang=lang, write=False, no_adapt=False, skeleton=False,
-        check=False, build=False, force=False, model=args.model, no_ai=args.no_ai)
+        check=False, build=False, force=False, model=args.model)
     return cmd_letter(letter_args)
 
 
@@ -262,10 +261,10 @@ def check_already_applied(offer: Offer, args) -> None:
 
 
 def read_facts(run: Run, offer: Offer) -> JobRecord:
-    """The facts of the offer, from the LLM (checked against the text) or patterns,
-    then whatever is missing typed by the user."""
+    """The facts of the offer, from the LLM (checked against the text), then whatever
+    is missing typed by the user."""
     chain = run.chain("extract")
-    ui.doing(f"Reading the offer{' with ' + chain[0] if chain else ''} ...")
+    ui.doing(f"Reading the offer with {chain[0]} ...")
 
     def attempt(llm):
         info, notes = extract(offer.text, llm)
@@ -276,8 +275,11 @@ def read_facts(run: Run, offer: Offer) -> JobRecord:
         return (info, notes), None
 
     result = run_with_fallback("extract", chain, attempt, run.llms, label=offer.key or run.args.company)
-    info, notes = result if result else extract(offer.text, None)
-    extracted_by = list(run.llms)[-1] if result else None      # the last model tried is the one that answered
+    if not result:
+        raise Stop(EXIT_NO_MODEL, "ERROR: no model could read the offer (see above). "
+                                  "Try again, or another model: --model provider:model")
+    info, notes = result
+    extracted_by = list(run.llms)[-1]          # the last model tried is the one that answered
     for note in notes:
         ui.note(note)
 
@@ -328,26 +330,23 @@ def save_application(offer: Offer, record: JobRecord, args) -> Path:
 def pick_content(run: Run, bank: dict, offer: str, folder: Path) -> tuple[Selection, MatchReport]:
     default = Selection.load(paths.DEFAULT_SELECTION)
     chain = run.chain("select")
-    result = None
-    if chain:
-        from ..pick.ai import select as ai_select
-        ui.doing(f"Asking {chain[0]} to pick content ...")
+    from ..pick.ai import select as ai_select
+    ui.doing(f"Asking {chain[0]} to pick content ...")
 
-        def attempt(llm):
-            sel, report = ai_select(bank, offer, default, llm)
-            unknown = [w for w in report.warnings if w.startswith(("unknown", "malformed"))]
-            if len(unknown) >= FALLBACK_AFTER_UNKNOWN:
-                return (sel, report), f"{len(unknown)} made-up ids"
-            return (sel, report), None
+    def attempt(llm):
+        sel, report = ai_select(bank, offer, default, llm)
+        unknown = [w for w in report.warnings if w.startswith(("unknown", "malformed"))]
+        if len(unknown) >= FALLBACK_AFTER_UNKNOWN:
+            return (sel, report), f"{len(unknown)} made-up ids"
+        return (sel, report), None
 
-        result = run_with_fallback("select", chain, attempt, run.llms, label=folder.name)
-    if result:
-        sel, report = result
-        for warning in report.warnings:
-            ui.note(warning)
-    else:
-        sel, report = keyword_select(bank, offer, default)
-        print(f"{ui.bold(f'Matched keywords ({len(report.found)}):')} {', '.join(report.found) or 'none'}")
+    result = run_with_fallback("select", chain, attempt, run.llms, label=folder.name)
+    if not result:
+        raise Stop(EXIT_NO_MODEL, "ERROR: no model could pick the content (see above). "
+                                  "Try again: resume " + folder.name)
+    sel, report = result
+    for warning in report.warnings:
+        ui.note(warning)
     return sel, report
 
 
@@ -397,9 +396,8 @@ def write_selection(folder: Path, sel: Selection, report: MatchReport, record: J
                     used: list[LLM], dropped: list[str], added: list[str]) -> None:
     why = textwrap.fill(report.why, 86, initial_indent="#   ", subsequent_indent="#   ")
     header = (f"# Generated by `python -m brain apply` for {record.company}.\n"
-              + ("".join(f"# LLM: {l.usage_line()}\n" for l in used) if used else "# No AI used (keyword matching)\n")
+              + "".join(f"# LLM: {l.usage_line()}\n" for l in used)
               + (f"# Why:\n{why}\n" if why else "")
-              + f"# Matched keywords: {', '.join(report.found) or 'none'}\n"
               + (f"# Dropped to fit one page: {', '.join(dropped)}\n" if dropped else "")
               + (f"# Added to fill the page: {', '.join(added)}\n" if added else "")
               + "# Edit freely, then rebuild with: python -m brain build " + show(folder / "selection.yaml") + "\n\n")

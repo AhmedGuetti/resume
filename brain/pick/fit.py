@@ -48,7 +48,7 @@ def fill_candidates(bank: dict, sel: Selection, report: MatchReport) -> list[Can
             for bid, bullet in bank_entry.bullets.items():
                 if usable(bullet) and bid not in on_page and not bank_entry.clash(bid, on_page):
                     key = BulletKey(section, entry.id, bid)
-                    candidates.append((report.bullets[key], rank, key))
+                    candidates.append((report.bullets.get(key, 0), rank, key))
     on_page = {p.id for p in sel.projects}
     for pid, score in report.projects.items():
         if pid not in on_page:
@@ -68,7 +68,7 @@ def add(sel: Selection, bank: dict, report: MatchReport, candidate: Candidate) -
         entry.bullets = [*(entry.bullets or []), bid]
         return f"{section}/{eid}/{bid}"
     pid = candidate
-    best = max(bank["projects"][pid].bullets, key=lambda b: report.bullets[BulletKey("projects", pid, b)])
+    best = max(bank["projects"][pid].bullets, key=lambda b: report.bullets.get(BulletKey("projects", pid, b), 0))
     sel.projects.append(EntryPick(id=pid, bullets=[best]))
     return f"projects/{pid}"
 

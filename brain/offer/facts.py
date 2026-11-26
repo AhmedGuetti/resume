@@ -8,8 +8,8 @@ Nothing may be invented:
     from ("quote"). Facts whose quote isn't in the offer are thrown away.
   - Dates and applicant counts are computed from those quotes by parsing.py
     ("2 weeks ago" -> a date), not by the model.
-  - Without an LLM (--no-ai), only the posting date and applicant count are
-    read, with simple patterns.
+  - The posting date and applicant count are also looked for with simple
+    patterns, when the model didn't quote them.
   - Whatever is still missing can be typed in by the user (app/terminal.py), or
     left empty. Empty stays null in job.json (record.py).
 """
@@ -22,7 +22,7 @@ from pydantic import BaseModel, Field, ValidationError, field_validator
 
 from ..llm import LLM
 from ..llm.answers import parse_json
-from .parsing import APPLICANTS_RE, POSTED_RE, guess_language, in_offer, normalize_language
+from .parsing import APPLICANTS_RE, POSTED_RE, in_offer, normalize_language
 
 # Facts with one value each. The model returns {"value": ..., "quote": "..."} for these.
 SCALAR_FIELDS = {
@@ -121,32 +121,30 @@ def empty_info() -> dict:
     return info
 
 
-def extract(offer: str, llm: LLM | None) -> tuple[dict, list[str]]:
+def extract(offer: str, llm: LLM) -> tuple[dict, list[str]]:
     """Returns (info, notes). info holds plain values; notes say what was thrown away."""
-    info, notes = empty_info(), []
-    if llm is not None:
-        answer, notes = ExtractAnswer.parse(
-            parse_json(llm.complete(SYSTEM, f"JOB OFFER:\n{offer.strip()}", json_output=True, task="extract")),
-            )
-        for name, fact in answer.facts.items():
-            if name in NO_QUOTE or in_offer(fact.quote, offer):
-                # for these three we keep the offer's own words; the numbers are parsed later
-                info[name] = fact.quote if name in ("salary", "posted", "applicants") else str(fact.value)
+    info = empty_info()
+    answer, notes = ExtractAnswer.parse(
+        parse_json(llm.complete(SYSTEM, f"JOB OFFER:\n{offer.strip()}", json_output=True, task="extract")))
+    for name, fact in answer.facts.items():
+        if name in NO_QUOTE or in_offer(fact.quote, offer):
+            # for these three we keep the offer's own words; the numbers are parsed later
+            info[name] = fact.quote if name in ("salary", "posted", "applicants") else str(fact.value)
+        else:
+            notes.append(f"dropped {name} = {fact.value!r}: not found in the offer")
+    for name, phrases in answer.lists.items():
+        kept = []
+        for phrase in phrases:
+            if in_offer(phrase, offer):
+                kept.append(phrase.strip())
             else:
-                notes.append(f"dropped {name} = {fact.value!r}: not found in the offer")
-        for name, phrases in answer.lists.items():
-            kept = []
-            for phrase in phrases:
-                if in_offer(phrase, offer):
-                    kept.append(phrase.strip())
-                else:
-                    notes.append(f"dropped from {name}: {phrase!r} (not in the offer)")
-            info[name] = kept
+                notes.append(f"dropped from {name}: {phrase!r} (not in the offer)")
+        info[name] = kept
 
-    # The language decides the resume's and the letter's language: always set it.
-    info["language"] = normalize_language(info["language"]) or guess_language(offer)
+    # The language decides the resume's and the letter's language (asked when unknown).
+    info["language"] = normalize_language(info["language"])
 
-    # Posting date and applicants: plain patterns work even without an LLM.
+    # Posting date and applicants: plain patterns, when the model didn't quote them.
     if not info["posted"]:
         m = POSTED_RE.search(offer)
         info["posted"] = m.group(0) if m else None

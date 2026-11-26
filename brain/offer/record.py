@@ -132,6 +132,6 @@ def to_record(info: dict, *, offer_file: str, user_fields: list[str], notes: lis
         **{k: info.get(k) or [] for k in ("skills_required", "skills_nice_to_have",
                                           "responsibilities", "benefits")},
         meta=Meta(recorded_at=dt.datetime.now().replace(microsecond=0), offer_file=offer_file,
-                  extracted_by=model or "patterns only (no AI)", typed_by_user=user_fields, dropped=notes),
+                  extracted_by=model or "unknown", typed_by_user=user_fields, dropped=notes),
         application=Application(history=[StatusChange(status="resume ready", date=dt.date.today())]),
     )

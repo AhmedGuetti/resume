@@ -42,7 +42,7 @@ class FitScore(BaseModel):
     requirements: list[RequirementCheck] = Field(default_factory=list)
     candidate: Candidate
     summary: str = ""                # the LLM's two sentences, if any
-    by: str                          # the model that judged the requirements, or "keywords"
+    by: str                          # the model that judged the requirements ("nobody" if none did)
     at: dt.datetime
 
 
@@ -100,7 +100,7 @@ def _total(parts: dict[str, Part], use_resume: bool) -> int | None:
 
 def fit_score(checks: list[RequirementCheck], you: Candidate, *, experience_years: str | None,
               seniority: str | None, education: str | None, summary: str = "",
-              by: str = "keywords", has_resume: bool = True) -> FitScore:
+              by: str = "nobody", has_resume: bool = True) -> FitScore:
     parts = {
         "required": _skills_part(checks, "required"),
         "nice": _skills_part(checks, "nice"),

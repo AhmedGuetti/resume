@@ -22,31 +22,31 @@ bank/              all the content, as Markdown (see bank/README.md)
 brain/             the Python side: reads the bank, picks content for an offer, builds PDFs
 config.example.yaml  copy to config.yaml (git-ignored) for the LLM model and API keys
 cv/
-  ninurta.sty      font, accent color and header, shared by the resume and the letter
-  resume.cls       resume layout and macros (\cventry, \cvskill, ...)
-  coverletter.cls  cover letter layout (cv/company/<name>/letter.md -> letter-<lang>.pdf)
-  resume-en.tex    English version (generated from bank/, don't edit)
-  resume-fr.tex    French version  (generated from bank/, don't edit)
+  ninurta.typ      font, accent color and header, shared by the resume and the letter (Typst)
+  resume.typ       resume layout
+  letter.typ       cover letter layout (cv/company/<name>/letter.md -> letter-<lang>.pdf)
   company/<name>/  tailored resumes, one folder per application (not in git)
 pdf/               the general resume as PDF (committed so it's easy to grab)
 web/               the Svelte page of `serve` (Pico CSS), built into web/dist
 scripts/           setup script for Arch Linux on WSL2
-extras/nvim/       my Neovim config for editing LaTeX (vimtex + texlab)
+extras/nvim/       my Neovim config (from the LaTeX days: vimtex + texlab)
 ```
 
-Style lives in the class file and content lives in `bank/`, each in one place.
-The `.tex` files in `cv/` are generated from `bank/selections/default.yaml` on every `make`,
-so to change the resume, edit the bank (or the default selection), not the `.tex`.
+Style lives in the Typst templates and content lives in `bank/`, each in one place.
+Python resolves the bank and a selection into plain data (JSON) and Typst lays it out, so
+to change the resume, edit the bank (or the default selection), and to change the look,
+edit `cv/*.typ`.
 
 ## Setup
 
-You need a TeX Live install with LuaLaTeX and `latexmk`, the Source Sans 3 font, `poppler`
-for `pdfinfo` / `pdftotext`, and Python 3 with the packages in `requirements.txt`
-(`pip install -r requirements.txt`). Without Source Sans 3 the build falls back to TeX Gyre Heros.
+You need Python 3 with the packages in `requirements.txt` (`pip install -r requirements.txt`;
+it includes `typst`, the PDF engine, so there's no TeX to install), the Source Sans 3 font,
+and `poppler` for `pdfinfo` / `pdftotext`. Without Source Sans 3 the build falls back to
+another sans font (TeX Gyre Heros, Liberation Sans or DejaVu Sans).
 
-To let an LLM pick the content, copy `config.example.yaml` to `config.yaml` and add a
+Tailoring is done by an LLM, so copy `config.example.yaml` to `config.yaml` and add a
 DeepSeek and a Google AI Studio API key (DeepSeek does the work, Gemini is the fallback).
-`config.yaml` is git-ignored.
+`config.yaml` is git-ignored. The main resume (`make`) needs no key.
 
 On Arch (including WSL), the bootstrap script installs everything:
 
@@ -59,14 +59,14 @@ On Arch (including WSL), the bootstrap script installs everything:
 ```bash
 make            # build both languages into pdf/
 make en         # just one
-make watch      # rebuild when bank/ or the class changes (LANG_=fr for French)
+make watch      # rebuild when bank/, brain/ or cv/*.typ change (LANG_=fr for French)
 make view       # open the PDF (WSL: uses the Windows default viewer)
-make check      # chktex lint + warns if a version spills onto a second page
-make text       # dump the PDFs to plain text in build/
-make clean      # remove aux files
+make text       # also dump the PDFs to plain text in build/ (warns if a page overflows)
+make clean      # remove build/
 ```
 
-Build artifacts go into `build/` (ignored by git); only the final PDFs are copied into `pdf/`.
+`make` is a shortcut for `python -m brain main` (`main` in the shell). A build takes
+about a tenth of a second.
 
 `make text` is worth running after edits: it shows roughly what an applicant tracking system
 will extract from the PDF, which is a quick way to catch weird ligatures, broken ordering
@@ -105,7 +105,7 @@ or `python -m brain apply "Company X"` (which asks you to paste the offer).
 
 `apply` makes both documents, in the language of the offer: a French offer gets a French
 resume and a French cover letter, an English offer English ones. The language comes from
-the offer (read by the model, or guessed from its words without AI); `--lang en|fr` forces
+the offer (read by the model, or asked when it can't tell); `--lang en|fr` forces
 it. `--only resume` or `--only letter` makes just one of the two; `letter <company>` makes
 or redoes the letter later.
 
@@ -114,13 +114,11 @@ It creates `cv/company/<company>/` with (for a French offer):
 ```
 offer.md          the offer text
 job.json          the facts of the offer (see below), including its language
-selection.yaml    what was picked, the keywords that matched, and what was added or dropped
+selection.yaml    what was picked and why, and what was added or dropped
 letter.md         the cover letter, each paragraph's source in a comment, to edit
 pdf/
   resume-fr.pdf   tailored resume
   letter-fr.pdf   cover letter
-tex/
-  resume-fr.tex   the LaTeX it was built from (LaTeX's temporary files go in tex/.build/)
 ```
 
 The other language is one command away: `build <company> --lang en` for the resume,
@@ -154,9 +152,10 @@ if that name is taken, so an earlier application is never overwritten.
 projects and skills to use, most relevant first. It only chooses: it never writes resume
 text, and any id it makes up is dropped (and reported). Bullets tagged `to-confirm` are
 never shown to it, and a bullet and its `-short` variant never end up on the same page, nor
-two bullets of a `conflicts:` group (declared in the bank file's front matter).
-Without a model, or with `--no-ai`, plain keyword matching does the job: it looks for the
-bank's tags and skill names in the offer, with a few English/French synonyms.
+two bullets of a `conflicts:` group (declared in the bank file's front matter). It also
+ranks a few spare bullets, added only if the page has room left. An entry it forgets keeps
+the general resume's bullets. If no model answers at all, `apply` stops and says so: there
+is no non-AI fallback.
 
 **Keeping the cost down.** `config.yaml` says which model does which job:
 
@@ -167,7 +166,7 @@ models:
   score: deepseek:deepseek-chat       # judge the fit (default: the select model)
   fallback: gemini:gemini-3.6-flash   # only when DeepSeek fails or answers badly
 budget:
-  daily: 0.50                         # $; when reached, apply goes on without AI
+  daily: 0.50                         # $; when reached, apply stops before the next call
   monthly: 5.00
 gemini_thinking: false                # Gemini's thinking is billed as output; off
 ```
@@ -178,11 +177,10 @@ gemini_thinking: false                # Gemini's thinking is billed as output; o
   offer last, so from the second application on, providers serve that part from their
   cache at a fraction of the price.
 - Every call is logged in `cv/company/.usage.jsonl` (tokens, cached tokens, estimated $).
-  Before each call the budget is checked; once a limit is reached, `apply` still works,
-  just without AI.
+  Before each call the budget is checked; once a limit is reached, `apply` stops.
 - `usage` (shell, or `python -m brain usage`) shows spending today, this month and in
   total, per model. `cost` shows the current shell session. In the shell, `model`
-  shows or changes the models (`model deepseek:deepseek-chat`, `model off`, `model config`).
+  shows or changes the models (`model deepseek:deepseek-chat`, `model config`).
 
 In a test run, one application cost about $0.001 with DeepSeek, and $0.0003 once the
 bank was cached. Estimates come from [brain/llm/pricing.yaml](brain/llm/pricing.yaml):
@@ -190,10 +188,9 @@ check it against your providers' billing pages now and then.
 
 ```bash
 make apply COMPANY="Company X" OFFER=offer.txt MODEL=deepseek:deepseek-chat   # one model for both jobs
-make apply COMPANY="Company X" OFFER=offer.txt NOAI=1                        # keywords only
 ```
 
-**Fitting one page.** Either way, it then drops the weakest bullets if the page overflows,
+**Fitting one page.** It then drops the weakest bullets if the page overflows,
 or, if there's room left, adds the next most relevant bullets and projects one at a time,
 keeping each one that still fits on one page in both languages (`--no-fill` skips this).
 
@@ -205,7 +202,7 @@ keeping each one that still fits on one page in both languages (`--no-fill` skip
   your level against the level asked (10) and your degree against the one asked (10). A part
   the offer doesn't mention is left out, not counted against you. With AI, the model judges
   each requirement but must cite bullets or skills of your bank as evidence; anything without
-  valid evidence counts as missing. Without AI, keyword matching does it.
+  valid evidence counts as missing. If no model answers, the requirements are left out of the score.
 - **Two numbers**: the fit of what's on this resume, and of everything in your bank. The gap is
   what the tailoring left out (it's listed).
 - **You** are computed from the bank: years of experience from the dates in
@@ -252,16 +249,17 @@ shows all options.
 brain/
   bank/      the content (bank/*.md) and Selection: what goes on one resume
   offer/     a job offer: facts checked against its text, job.json, already applied?
-  pick/      choose content for an offer (keywords or LLM), fit it on one page
+  pick/      the LLM chooses content for an offer; fit it on one page
   score/     fit score against the offer, competition, position
   gaps/      gap interview: your answers -> checked bank bullets, "no" answers in bank/gaps.md
-  render/    selection -> LaTeX -> PDF
+  render/    selection -> data -> PDF (Typst templates in cv/)
   letter/    cover letters: styles, bank/letters/ paragraphs, assembling, checks, letter.md -> PDF
   llm/       one client per provider, fallback chain, spending log and budget
-  app/       the CLI, the `apply` pipeline step by step, the ninurta> shell
+  app/       commands.py (every command, once), the CLI and ninurta> shell built from it,
+             the `apply` pipeline step by step
   paths.py   where everything lives
   config.py  reads config.yaml / environment: models per job, budget, API keys
-  errors.py  BankError, LatexError
+  errors.py  BankError, RenderError
 ```
 
 Each folder's `__init__.py` lists what its files do; `brain/__init__.py` has the overall map.
@@ -279,11 +277,12 @@ ninurta> translate             # after rewriting English paragraphs: redo their 
 
 - **Style.** Four styles ([brain/letter/styles.yaml](brain/letter/styles.yaml)): *direct and
   plain*, *warm and personal*, *formal and classic*, *engineer's story*. A model suggests one
-  for the company and must quote the offer to back it (keyword cues without AI); I choose.
+  for the company and must quote the offer to back it (formal for French, direct otherwise,
+  if no model answers); I choose.
   Each style is four slots, and each slot says which kind of paragraph fills it.
 - **Picking.** For each slot, the paragraph of my bank that fits the offer best: a model
-  picks (ids it makes up, or of the wrong kind, are dropped), or tag matching plus the fit
-  score's evidence without AI. I see the picks and can swap any of them.
+  picks (ids it makes up, or of the wrong kind, are dropped; a slot it skips gets the first
+  paragraph that fits). I see the picks and can swap any of them.
 - **What the AI writes.** `{company}` and `{job_title}` are filled in from the offer. The
   story gets at most one linking sentence at its end, naming the company or the role: my
   text is never changed. The "why them" paragraph is drafted from the offer and marked for me
@@ -297,8 +296,8 @@ ninurta> translate             # after rewriting English paragraphs: redo their 
   banned phrases (`bank/voice.md`). They point; they never rewrite.
 - **Result.** `cv/company/<name>/letter.md`, in the offer's language (`--lang` to change it),
   with each paragraph's source and what the AI did in a comment above it. Edit it, then
-  `letter <name> --build`. It's built with [cv/coverletter.cls](cv/coverletter.cls), which
-  shares [cv/ninurta.sty](cv/ninurta.sty) (font, accent color, header) with the resume.
+  `letter <name> --build`. It's laid out by [cv/letter.typ](cv/letter.typ), which
+  shares [cv/ninurta.typ](cv/ninurta.typ) (font, accent color, header) with the resume.
 - `letter <name> --write` writes it paragraph by paragraph instead, with questions, ways to
   start and the checks after each one; `--skeleton` puts that guidance in `letter.md` as
   comments, for an editor; `--no-adapt` adds no sentence; `--check` only runs the checks.
@@ -338,8 +337,8 @@ GitHub Flow with two long-lived branches:
 | `<feature>` | one short branch per change, from `dev`, merged back by pull request. |
 
 Both `main` and `dev` are protected: changes go in by pull request, and CI must pass
-(`tests`: pytest; `resume`: the main resume builds on one page in both languages and the
-committed `.tex` match the bank; `web`: the page builds).
+(`tests`: pytest; `resume`: the main resume builds on one page in both languages;
+`web`: the page builds).
 
 ```bash
 git switch dev && git pull && git switch -c my-change
@@ -360,14 +359,13 @@ git switch main && git pull && git tag v1.1.0 && git push origin v1.1.0
 ## Editing
 
 Content is plain Markdown in `bank/`, so any editor works for it; run `make watch` alongside
-to see the PDF update as you save. For the LaTeX side (the class file), I use Neovim with
-[vimtex](https://github.com/lervag/vimtex) and the `texlab` language server.
-The config I use is in [extras/nvim/latex.lua](extras/nvim/latex.lua); drop it into a lazy.nvim
-setup if you want the same thing.
+to see the PDF update as you save. The look is in `cv/*.typ` ([Typst](https://typst.app/docs/));
+`tinymist` is a good Typst language server for Neovim or VS Code. My old LaTeX editor setup is
+still in [extras/nvim/latex.lua](extras/nvim/latex.lua).
 
 ## Using it as a template
 
-Feel free to borrow the class file, the bank format and the code. Please swap out my
+Feel free to borrow the templates, the bank format and the code. Please swap out my
 personal details before sending a resume anywhere.
 
 ## License

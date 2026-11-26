@@ -193,14 +193,6 @@ def test_on_resume(bank, default_sel):
     assert not on_resume(bank, None, ev)
 
 
-def test_keyword_requirements(bank, default_sel):
-    checks, summary, _ = check_requirements(
-        bank, [("Python", "required"), ("Fluent in Klingon", "nice")], default_sel, None)
-    assert checks[0].status == "met" and "skill:Python" in checks[0].evidence
-    assert checks[1].status == "unclear"
-    assert summary == ""
-
-
 def test_llm_requirements_need_real_evidence(bank, default_sel, fake_llm):
     ev = _a_bullet(bank)
     llm = fake_llm({"requirements": [
@@ -227,7 +219,7 @@ def test_score_application_fills_and_round_trips(bank, default_sel, tmp_path):
                        applicants={"text": "Over 100 applicants", "count": 100, "at_least": True})
     score_application(bank, record, default_sel, chain=[], llms={}, label="acme", ask=False)
 
-    assert record.fit.by == "keywords" and record.fit.bank is not None
+    assert record.fit.by == "nobody" and record.fit.bank is not None    # no model: requirements left out
     assert record.competition[0].applicants == 100           # taken from the offer
     assert record.position.verdict in ("strong", "possible", "long shot")
 
@@ -238,24 +230,9 @@ def test_score_application_fills_and_round_trips(bank, default_sel, tmp_path):
     assert again.competition == record.competition
 
 
-# ---------- letter ↔ offer ----------
+# ---------- the summary box ----------
 
 from brain.app import ui
-from brain.score.letter import LetterMatch, letter_match
-
-
-def test_letter_match_counts_must_haves_and_offer_keywords(bank):
-    offer = "We need Python and LangGraph. Docker is required."
-    letter = "I built LLM agents with LangGraph in Python at Magellan."
-    m = letter_match(bank, offer, ["Python", "LangGraph", "Docker"], letter)
-    assert m.required_hit == ["Python", "LangGraph"] and m.required_missed == ["Docker"]
-    assert "langgraph" in m.keywords_hit and "docker" in m.keywords_missed
-    assert 0 < m.score < 100
-
-
-def test_letter_match_score_without_requirements_uses_keywords_only():
-    assert LetterMatch(keywords_hit=["a"], keywords_missed=["b"]).score == 50
-    assert LetterMatch().score is None
 
 
 def test_box_is_plain_and_aligned_without_a_terminal(capsys, monkeypatch):

@@ -1,53 +1,36 @@
-# Ninurta build. Engine: LuaLaTeX via latexmk (see .latexmkrc)
-LANGS  := en fr
-LANG_  ?= en
-PDFDIR := pdf
-# Content comes from bank/; the main resume is the default selection.
-DEFAULT_SEL := bank/selections/default.yaml
-BANK_SRC    := $(shell find bank -name '*.md') $(DEFAULT_SEL) $(shell find brain -name '*.py')
+# Ninurta build. The PDFs are laid out by Typst (cv/*.typ), from Python: python -m brain
+LANG_ ?= en
 
-.PHONY: all $(LANGS) watch view check text clean distclean apply tailor catalog shell web serve
+.PHONY: all en fr watch view check text clean apply tailor shell web serve catalog
 
-all: $(LANGS)
+# Main resume: pdf/resume-{en,fr}.pdf from bank/selections/default.yaml
+all:
+	@python3 -m brain main
 
-# cv/resume-<lang>.tex is generated from the bank whenever the bank changes
-cv/resume-%.tex: $(BANK_SRC)
-	python3 -m brain build $(DEFAULT_SEL) --tex-dir cv --no-pdf --lang $*
+en fr:
+	@python3 -m brain main $@
 
-$(LANGS): %: cv/resume-%.tex
-	@mkdir -p $(PDFDIR)
-	latexmk cv/resume-$@.tex
-	@cp build/resume-$@.pdf $(PDFDIR)/resume-$@.pdf
-	@echo "-> $(PDFDIR)/resume-$@.pdf ($$(pdfinfo $(PDFDIR)/resume-$@.pdf | awk '/^Pages/{print $$2}') page(s))"
-
-# Continuous rebuild on save (bank/ or resume.cls):  make watch LANG_=fr
-watch: cv/resume-$(LANG_).tex
-	@while :; do $(MAKE) -s --no-print-directory cv/resume-$(LANG_).tex; sleep 1; done & \
-	  trap 'kill $$! 2>/dev/null' EXIT INT TERM; \
-	  latexmk -pvc -view=none cv/resume-$(LANG_).tex
+# Rebuild when bank/, brain/ or the templates change:  make watch LANG_=fr
+watch:
+	@mkdir -p build; touch build/.watch; python3 -m brain main $(LANG_); \
+	while sleep 1; do \
+	  if [ -n "$$(find bank brain cv -maxdepth 3 -newer build/.watch \( -name '*.md' -o -name '*.yaml' -o -name '*.py' -o -name '*.typ' \) -not -path 'cv/company/*' | head -1)" ]; then \
+	    touch build/.watch; python3 -m brain main $(LANG_); fi; done
 
 # Open in the Windows default PDF viewer (SumatraPDF recommended: auto-reloads, no file lock)
 view: $(LANG_)
-	@if command -v wslview >/dev/null; then wslview $(PDFDIR)/resume-$(LANG_).pdf; \
-	else explorer.exe "$$(wslpath -w $(PDFDIR)/resume-$(LANG_).pdf)" || true; fi
+	@if command -v wslview >/dev/null; then wslview pdf/resume-$(LANG_).pdf; \
+	else explorer.exe "$$(wslpath -w pdf/resume-$(LANG_).pdf)" || true; fi
 
-# Plain-text dump = roughly what an ATS parser "sees". Review it after edits.
-text: all
-	@for l in $(LANGS); do pdftotext -layout $(PDFDIR)/resume-$$l.pdf build/resume-$$l.txt; done
-	@echo "-> build/resume-*.txt"
-
-# Lint + one-page guard + text extraction
-check: text
-	@for l in $(LANGS); do chktex -q -n1 -n8 -n36 cv/resume-$$l.tex || true; done
-	@for l in $(LANGS); do p=$$(pdfinfo $(PDFDIR)/resume-$$l.pdf | awk '/^Pages/{print $$2}'); \
-	  if [ "$$p" -gt 1 ]; then echo "WARN: resume-$$l is $$p pages"; fi; done
+# Plain-text dump = roughly what an ATS parser "sees" (build/resume-*.txt). Review it after edits.
+text check:
+	@python3 -m brain main --text
 
 # Tailored resume + cover letter for a job offer, in the offer's language:
 #   make apply COMPANY="Company X" OFFER=offer.txt
-# -> cv/company/company-x/pdf/resume-<lang>.pdf and letter-<lang>.pdf (LaTeX sources in .../tex/)
 apply:
-	@test -n "$(COMPANY)" || { echo 'usage: make apply COMPANY="Company X" [OFFER=offer.txt] [MODEL=provider:model] [NOAI=1] [ONLY=resume|letter] [LANG_=en|fr]'; exit 1; }
-	python3 -m brain apply "$(COMPANY)" $(if $(OFFER),--offer "$(OFFER)") $(if $(MODEL),--model "$(MODEL)") $(if $(NOAI),--no-ai) $(if $(ONLY),--only $(ONLY)) $(if $(filter command line,$(origin LANG_)),--lang $(LANG_))
+	@test -n "$(COMPANY)" || { echo 'usage: make apply COMPANY="Company X" [OFFER=offer.txt] [MODEL=provider:model] [ONLY=resume|letter] [LANG_=en|fr]'; exit 1; }
+	python3 -m brain apply "$(COMPANY)" $(if $(OFFER),--offer "$(OFFER)") $(if $(MODEL),--model "$(MODEL)") $(if $(ONLY),--only $(ONLY)) $(if $(filter command line,$(origin LANG_)),--lang $(LANG_))
 
 # Rebuild after hand-editing a selection:  make tailor SEL=cv/company/company-x/selection.yaml
 tailor:
@@ -70,7 +53,4 @@ catalog:
 	@python3 -m brain catalog
 
 clean:
-	latexmk -c cv/resume-en.tex cv/resume-fr.tex
-
-distclean:
-	rm -rf build $(PDFDIR)
+	rm -rf build

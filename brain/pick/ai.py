@@ -5,12 +5,12 @@ answers with JSON: which bullets, projects and skills to use, in what order.
 It only chooses: it never writes resume text, so nothing can be invented.
 
 Everything it returns is checked against the bank. Unknown ids are dropped (and
-reported), and any entry it forgot falls back to the keyword pick, so a bad
-answer can make the resume worse but never break it.
+reported), and any entry it forgot keeps the general resume's bullets
+(bank/selections/default.yaml), so a bad answer can make the resume worse but never break it.
 
-The result has the same shape as keywords.select(), so fit.py works unchanged:
-bullets the model chose get high scores (first = best), everything else keeps
-its keyword score for filling leftover space.
+The model also ranks "spare" bullets: what to add, best first, if the page has room
+left. The scores in the report follow the model's order (picks first, then spares),
+so fit.py knows what to drop first and what to add first.
 """
 from __future__ import annotations
 
@@ -22,7 +22,6 @@ from pydantic import BaseModel, Field
 from ..bank import ENTRY_SECTIONS, EntryPick, Selection, usable
 from ..llm import LLM
 from ..llm.answers import lenient_list, parse_json
-from .keywords import select as keyword_select
 from .report import BulletKey, MatchReport
 
 SYSTEM = """\
@@ -44,6 +43,9 @@ then other useful ones; 4 to 8 items per group. Always keep every item of the \
 it: never pick both.
 - Each entry may list "conflicts": groups of bullet ids that say the same thing. \
 Pick at most one bullet from each group.
+- spare: up to 12 more bullets, written "section/entry/bullet" (e.g. \
+"experience/magellan/overview"), that would also help with this offer, best first. They \
+are added only if the page has room left; same rules (no conflicts with your picks).
 - "why": 2-3 sentences on what the offer wants and how the picks answer it.
 
 Answer with one JSON object only, no markdown:
@@ -51,6 +53,7 @@ Answer with one JSON object only, no markdown:
  "education":  [{"id": "...", "bullets": ["..."]}],
  "projects":   [{"id": "...", "bullets": ["..."]}],
  "skills":     [{"id": "...", "items": ["..."]}],
+ "spare": ["section/entry/bullet"],
  "why": "..."}
 """
 
@@ -89,6 +92,7 @@ class SelectAnswer(BaseModel):
     education: list[LLMEntryPick] = Field(default_factory=list)
     projects: list[LLMEntryPick] = Field(default_factory=list)
     skills: list[LLMSkillPick] = Field(default_factory=list)
+    spare: list[str] = Field(default_factory=list)
     why: str = ""
 
     @classmethod
@@ -100,6 +104,7 @@ class SelectAnswer(BaseModel):
         answer = cls(
             **{s: lenient_list(LLMEntryPick, data.get(s), s, warnings) for s in ENTRY_SECTIONS},
             skills=lenient_list(LLMSkillPick, data.get("skills"), "skills", warnings),
+            spare=[str(x) for x in data.get("spare") or [] if isinstance(x, str)],
             why=str(data.get("why") or "").strip())
         return answer, warnings
 
@@ -107,8 +112,10 @@ class SelectAnswer(BaseModel):
 # ---------- picking ----------
 
 def select(bank: dict, offer: str, default: Selection, llm: LLM) -> tuple[Selection, MatchReport]:
-    """Same contract as keywords.select(): returns (selection, report)."""
-    sel, report = keyword_select(bank, offer, default)        # fallback + scores for filling
+    """Returns (selection, report). Starts from the general resume (`default`), so an
+    entry the model forgets keeps its usual bullets."""
+    sel = Selection.from_dict(default.to_dict())
+    report = MatchReport(bullets={}, projects={})
     # The bank goes in the system prompt, right after the fixed instructions: that
     # beginning is identical for every offer, so providers serve it from their cache.
     system = f"{SYSTEM}\nCONTENT BANK:\n{bank_for_prompt(bank)}"
@@ -148,7 +155,7 @@ def select(bank: dict, offer: str, default: Selection, llm: LLM) -> tuple[Select
             if entry.id in picks:
                 entry.bullets = picks[entry.id]
             else:
-                warnings.append(f"model skipped {section}/{entry.id}, kept the keyword pick")
+                warnings.append(f"model skipped {section}/{entry.id}, kept the general resume's bullets")
 
     # projects: the model's choice and order
     picks = model_entries("projects")
@@ -168,13 +175,23 @@ def select(bank: dict, offer: str, default: Selection, llm: LLM) -> tuple[Select
         if chosen:
             group.items = list(dict.fromkeys(chosen))
 
-    # scores: the model's picks rank above anything left for filling
+    # scores: the model's picks first (in its order), then its spares, then nothing
     for section in ("experience", "education", "projects"):
         for entry in sel.entries(section):
             for rank, bid in enumerate(entry.bullet_ids()):
                 report.bullets[BulletKey(section, entry.id, bid)] = 100 - rank
     for i, project in enumerate(sel.projects):
         report.projects[project.id] = 100 - i
+    for rank, label in enumerate(answer.spare):
+        parts = label.split("/")
+        if (len(parts) != 3 or parts[0] not in ENTRY_SECTIONS or parts[1] not in bank[parts[0]]
+                or parts[2] not in bank[parts[0]][parts[1]].bullets):
+            warnings.append(f"unknown spare bullet '{label}'")
+            continue
+        key = BulletKey(*parts)
+        report.bullets.setdefault(key, 50 - rank)
+        if parts[0] == "projects":
+            report.projects.setdefault(parts[1], 50 - rank)
 
     report.why = answer.why
     report.warnings = warnings

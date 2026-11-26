@@ -1,48 +1,29 @@
 #!/usr/bin/env bash
-# Bootstrap a LaTeX toolchain for Ninurta on Arch Linux (WSL2).
-# Safe to re-run. Usage:
-#   ./scripts/bootstrap-arch-wsl.sh          # standard install (~600 MB)
-#   ./scripts/bootstrap-arch-wsl.sh --full   # + texlive-fontsextra (~1.5 GB more fonts)
+# Set up Ninurta on Arch Linux (WSL2). Safe to re-run:
+#   ./scripts/bootstrap-arch-wsl.sh
+# The PDFs are laid out by Typst, which comes with the Python packages: no TeX to install.
 set -euo pipefail
-
-FULL=0
-[[ "${1:-}" == "--full" ]] && FULL=1
 
 if ! grep -qi arch /etc/os-release; then
   echo "This script targets Arch Linux." >&2; exit 1
 fi
 
 PKGS=(
-  # TeX Live (Arch splits it into collections)
-  texlive-basic texlive-bin texlive-latex texlive-latexrecommended
-  texlive-latexextra texlive-fontsrecommended texlive-luatex texlive-xetex
-  texlive-binextra           # latexmk, chktex, latexindent, synctex
-  texlive-langfrench texlive-langenglish
-  adobe-source-sans-fonts    # main resume font (Source Sans 3)
-  # latexindent's Perl deps
-  perl-yaml-tiny perl-file-homedir
-  # Editor tooling
-  texlab                     # LaTeX language server (Neovim, VS Code, etc.)
-  poppler                    # pdftotext / pdfinfo (used by make text / check)
-  make git
-  python-yaml                # PyYAML, for the brain package
-  python-pydantic            # typed data (selections, job.json, LLM answers)
+  adobe-source-sans-fonts    # the resume font (Source Sans 3)
+  poppler                    # pdftotext / pdfinfo (page count, `make text`)
+  python python-pip make git
 )
-(( FULL )) && PKGS+=(texlive-fontsextra)
+# For editing cv/*.typ, a Typst language server helps: tinymist (AUR or `cargo install`).
 
 echo "==> Updating system and installing packages"
 sudo pacman -Syu --needed --noconfirm "${PKGS[@]}"
-
-echo "==> Building font caches"
 fc-cache -f >/dev/null
-luaotfload-tool -u >/dev/null 2>&1 || true
 
-echo "==> Versions"
-lualatex --version | head -1
-latexmk -v | head -2 | tail -1
-texlab --version || true
+echo "==> Python packages (typst, pydantic, ...)"
+pip install --user -r "$(dirname "$0")/../requirements.txt" || \
+  pip install --user --break-system-packages -r "$(dirname "$0")/../requirements.txt"
 
-cat <<'EOF'
+cat <<'MSG'
 
 Done. Next:
   cd ~/resume && make        # builds pdf/resume-en.pdf and pdf/resume-fr.pdf
@@ -50,4 +31,4 @@ Done. Next:
   make view LANG_=en         # open the PDF in your Windows default viewer
 
 Windows path to this repo: \\wsl.localhost\<distro>\home\<user>\resume  (distro name: `wsl -l` in PowerShell)
-EOF
+MSG

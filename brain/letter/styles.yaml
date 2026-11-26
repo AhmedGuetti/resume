@@ -11,7 +11,6 @@
 #                company  what the offer says about the role and the company
 #   fill       which kind of paragraph from bank/letters/ goes here when a letter is
 #              assembled: opener, story, motivation, close, or why (drafted from the offer)
-#   cues       words in an offer that point to this style (used to suggest one)
 
 direct:
   name: Direct and plain
@@ -23,8 +22,6 @@ direct:
   salutation: {en: "Dear {recipient},", fr: "Bonjour {recipient},"}
   recipient_default: {en: "Hiring Team", fr: "l'équipe de recrutement"}
   signoff: {en: "Best regards,", fr: "Bien cordialement,"}
-  cues: [startup, start-up, scale-up, seed, series a, series b, fast-paced, small team, ship, shipping,
-         ownership, autonomy, remote-first, founders, early-stage, move fast, hands-on]
   paragraphs:
     - id: hook
       fill: opener
@@ -108,8 +105,6 @@ warm:
   salutation: {en: "Dear {recipient},", fr: "Bonjour {recipient},"}
   recipient_default: {en: "Hiring Team", fr: "l'équipe de recrutement"}
   signoff: {en: "Warm regards,", fr: "Bien cordialement,"}
-  cues: [mission, values, impact, culture, community, purpose, care, patients, healthcare, hospital, education,
-         non-profit, association, inclusive, diversity, wellbeing, people-first, our story]
   paragraphs:
     - id: hook
       fill: motivation
@@ -192,9 +187,6 @@ formal:
   signoff:
     en: "Yours faithfully,"
     fr: "Je vous prie d'agréer, Madame, Monsieur, l'expression de mes salutations distinguées."
-  cues: [groupe, group, bank, banque, assurance, insurance, ministère, public, fonction publique, cnrs, inria,
-         chu, hôpital, consulting, conseil, cabinet, defense, défense, aerospace, aéronautique,
-         "h/f", "f/h", cdi, poste à pourvoir, nous recherchons]
   paragraphs:
     - id: you
       fill: why
@@ -273,9 +265,6 @@ story:
   salutation: {en: "Dear {recipient},", fr: "Bonjour {recipient},"}
   recipient_default: {en: "Hiring Team", fr: "l'équipe de recrutement"}
   signoff: {en: "Best regards,", fr: "Bien cordialement,"}
-  cues: [research, r&d, recherche, phd, thèse, laboratory, laboratoire, benchmark, evaluation, state of the art,
-         state-of-the-art, hard problems, deep tech, algorithm, algorithme, model, modèle, inference,
-         machine learning, llm, agents, nlp]
   paragraphs:
     - id: problem
       fill: opener

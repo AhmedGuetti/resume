@@ -4,12 +4,9 @@ The requirements are the offer's skills lists from job.json (required and nice t
 For each one the answer is met / partial / missing / unclear, plus the evidence:
 ids of bank bullets ("experience/magellan/overview") or skills ("skill:Python").
 
-  - With an LLM: the model judges each requirement, but must cite evidence ids. Every id
-    is checked against the bank; a "met" or "partial" with no valid evidence becomes
-    "missing". The model judges, it never gets the last word on what exists.
-  - Without: a requirement is met when it mentions a keyword the bank knows (a tag or a
-    skill), and the evidence is the bullets and skills carrying it. A requirement that
-    mentions no known keyword is "unclear" and left out of the score.
+The model judges each requirement, but must cite evidence ids. Every id is checked
+against the bank; a "met" or "partial" with no valid evidence becomes "missing". The
+model judges, it never gets the last word on what exists.
 
 Each check also says whether its evidence is on this resume (the selection), so the
 score can be given for the whole bank and for the page you actually send.
@@ -24,7 +21,6 @@ from ..bank import ENTRY_SECTIONS, Selection, usable
 from ..llm import LLM
 from ..llm.answers import lenient_list, parse_json
 from ..pick.ai import bank_for_prompt
-from ..pick.keywords import bank_keywords, mentions, pattern, skill_keywords
 
 Status = Literal["met", "partial", "missing", "unclear"]
 Kind = Literal["required", "nice"]
@@ -152,44 +148,15 @@ def _with_llm(bank: dict, reqs: list[tuple[str, Kind]], llm: LLM,
     return checks, str(data.get("summary") or "").strip()
 
 
-# ---------- without ----------
-
-def _with_keywords(bank: dict, reqs: list[tuple[str, Kind]]) -> list[RequirementCheck]:
-    known = bank_keywords(bank)
-    checks = []
-    for text, kind in reqs:
-        found = {k for k in known if mentions(text, k)}
-        if not found:
-            checks.append(RequirementCheck(text=text, kind=kind, status="unclear"))
-            continue
-        evidence = []
-        for section in ENTRY_SECTIONS:
-            for eid, entry in bank[section].items():
-                for bid, b in entry.bullets.items():
-                    if usable(b) and ({t.lower() for t in b.tags} & found
-                                      or any(pattern(k).search(b.text["en"].lower()) for k in found)):
-                        evidence.append(f"{section}/{eid}/{bid}")
-        for group in bank["skills"].values():
-            for item in group.items:
-                if set(skill_keywords(item["en"])) & found:
-                    evidence.append(f"skill:{item['en']}")
-        checks.append(RequirementCheck(text=text, kind=kind, status="met" if evidence else "missing",
-                                       evidence=evidence))
-    return checks
-
-
 # ---------- entry point ----------
 
 def check_requirements(bank: dict, reqs: list[tuple[str, Kind]], sel: Selection | None,
-                       llm: LLM | None) -> tuple[list[RequirementCheck], str, list[str]]:
-    """Returns (checks, summary, warnings). summary is empty without an LLM."""
+                       llm: LLM) -> tuple[list[RequirementCheck], str, list[str]]:
+    """Returns (checks, summary, warnings)."""
     warnings: list[str] = []
     if not reqs:
         return [], "", warnings
-    if llm is not None:
-        checks, summary = _with_llm(bank, reqs, llm, warnings)
-    else:
-        checks, summary = _with_keywords(bank, reqs), ""
+    checks, summary = _with_llm(bank, reqs, llm, warnings)
     for c in checks:
         c.on_resume = any(on_resume(bank, sel, ev) for ev in c.evidence)
     return checks, summary, warnings

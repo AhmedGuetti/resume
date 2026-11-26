@@ -2,3 +2,4 @@ pyyaml
 pydantic>=2
 httpx
 google-genai
+typst>=0.15

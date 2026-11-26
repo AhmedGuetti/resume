@@ -227,5 +227,5 @@ def cmd_gaps(args) -> int:
         from .apply import cmd_apply
         return cmd_apply(argparse.Namespace(
             company=folder.name, offer=None, paste=False, url=None, force=True, model=args.model,
-            no_ai=False, no_fill=False, no_score=False, no_gaps=True, only="resume", lang=None))
+            no_fill=False, no_score=False, no_gaps=True, only="resume", lang=None))
     return 0
