@@ -7,7 +7,7 @@ from brain.bank import BulletPick, Selection
 from brain.compose.approved import Approved
 from brain.compose.facts import GENERAL, load_facts, unsupported
 from brain.compose.match import Match, Requirement, read_answer, split_list
-from brain.compose.pipeline import drafts_from, drop_order, to_selection
+from brain.compose.pipeline import MAX_TOP_UP, drafts_from, drop_order, fit_page, to_selection, top_up
 from brain.compose.plan import MIN_BULLETS, make_plan
 from brain.compose.review import Tools, review
 from brain.compose.write import Bullet, Draft, check, compose
@@ -187,6 +187,58 @@ def test_drop_order_projects_then_education_then_extra_experience(bank, facts, d
     sections = [s for s, _ in order]
     assert sections[0] == "projects" and sections.index("education") < sections.index("experience")
     assert sum(1 for s in sections if s == "experience") == 3 * (3 - MIN_BULLETS)
+
+
+def _drafts(plan, n):
+    """n(section) bullets per entry, short ones, from the entry's pool."""
+    return [Draft(ep, [Bullet(f"Short bullet {i} of {ep.entry}.", [p.key], value=1.0)
+                       for i, p in zip(range(n(ep.section)), ep.pool)]) for ep in plan.entries]
+
+
+def test_fit_page_puts_back_what_fits_after_a_long_bullet_goes(bank, facts, default_sel, tmp_path):
+    plan = _plan(bank, facts, default_sel, ("AI coding tools", "required", [(NINURTA, 3)]))
+    drafts = _drafts(plan, lambda s: {"experience": 2, "education": 1, "projects": 1}[s])
+    mag = next(d for d in drafts if d.where == MAG)
+    long = Bullet("Very long words " * 900, [mag.plan.pool[-1].key], value=0.5)   # more than a page
+    mag.bullets.append(long)
+    sel, pages, dropped = fit_page(bank, default_sel, plan, drafts, "en", tmp_path)
+    assert pages == 1 and not any(b is long for b in mag.bullets)
+    assert len(dropped) == 1 and dropped[0].startswith(MAG)                  # only the long one stays out
+    assert all(d.bullets for d in drafts if d.plan.section == "projects")    # the short project came back
+
+
+def test_top_up_adds_bullets_to_a_short_page_and_takes_back_bad_ones(bank, facts, default_sel, tmp_path):
+    plan = _plan(bank, facts, default_sel, ("LangGraph", "required", [(BP, 3)]))
+    drafts = _drafts(plan, lambda s: 1 if s == "experience" else 0)        # a mostly empty page
+    calls = []
+
+    def add(d):
+        calls.append(d.where)
+        used = {k for b in d.bullets for k in b.facts}
+        key = next(p.key for p in d.plan.pool if p.key not in used)
+        d.bullets.append(Bullet("Added bullet with some words " * 6, [key], value=1.0))
+        return ["made-up number"] if len(calls) == 1 else []               # the first one is bad
+
+    added, stopped = top_up(bank, default_sel, plan, drafts, "en", tmp_path, add)
+    assert stopped is None and len(added) == MAX_TOP_UP
+    assert calls[0] not in calls[1:]                                        # a bad bullet: next entry
+    experiences = [d for d in drafts if d.plan.section == "experience"]
+    assert sum(len(d.bullets) for d in experiences) == len(experiences) + MAX_TOP_UP
+    assert len(next(d for d in drafts if d.where == calls[0]).bullets) == 1   # the bad one was taken back
+
+
+def test_top_up_stops_quietly_when_the_model_fails(bank, facts, default_sel, tmp_path):
+    plan = _plan(bank, facts, default_sel, ("LangGraph", "required", [(BP, 3)]))
+    drafts = _drafts(plan, lambda s: 1 if s == "experience" else 0)
+    before = [list(d.bullets) for d in drafts]
+
+    def add(d):
+        d.bullets.append(Bullet("half written", [], value=0.0))
+        raise RuntimeError("over budget")
+
+    added, stopped = top_up(bank, default_sel, plan, drafts, "en", tmp_path, add)
+    assert added == [] and stopped == "over budget"
+    assert [d.bullets for d in drafts] == before
 
 
 def test_selection_round_trip_renders_and_counts_facts_as_evidence(bank, facts, default_sel):

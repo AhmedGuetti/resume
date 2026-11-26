@@ -15,15 +15,20 @@ from ..bank import BulletPick, EntryPick, Selection, SkillPick, per_lang
 from ..llm import LLM
 from ..llm.fallback import run_with_fallback
 from ..offer.record import JobRecord
-from ..render.pdf import build_all
+from ..render.pdf import build_all, page_fill
+from ..render.resume import resume_data
 from .approved import Approved
 from .facts import Fact, load_facts
 from .match import Match, Requirement, match
-from .plan import MIN_BULLETS, EntryPlan, Pick, Plan, make_plan
+from .plan import MAX_BULLETS, MIN_BULLETS, EntryPlan, Pick, Plan, make_plan
 from .review import Tools, default_ask, review
 from .write import Bullet, Draft, add_one, check, compose, finish, redo
 
 FALLBACK_AFTER_UNKNOWN = 3      # this many made-up fact keys -> try the fallback model
+# Filling the page: below FULL_ENOUGH of the page, the model writes up to MAX_TOP_UP more
+# bullets; what's left of the page after that is spread between entries by cv/resume.typ.
+FULL_ENOUGH = 0.93
+MAX_TOP_UP = 3
 
 
 class NoModel(Exception):
@@ -96,17 +101,69 @@ def drop_order(drafts: list[Draft]) -> list[tuple[Draft, int]]:
 
 def fit_page(bank: dict, default: Selection, plan: Plan, drafts: list[Draft], lang: str,
              folder: Path) -> tuple[Selection, int, list[str]]:
-    """Build; while it's longer than a page, drop the first bullet of drop_order."""
-    dropped = []
+    """Build; while it's longer than a page, drop the first bullet of drop_order. Then put
+    back what was dropped, most valuable first, wherever it still fits: dropping a long
+    bullet can leave room for a shorter one."""
+    dropped: list[tuple[Draft, int, Bullet]] = []
     while True:
         sel = to_selection(default, plan, drafts, lang)
         pages = build_all(bank, sel, folder, [lang])[lang]
         order = drop_order(drafts)
         if pages <= 1 or not order:
-            return sel, pages, dropped
+            break
         d, i = order[0]
-        dropped.append(f"{d.where}: {d.bullets[i].text[:70]}")
-        del d.bullets[i]
+        dropped.append((d, i, d.bullets.pop(i)))
+    if pages <= 1 and len(dropped) > 1:            # the last one dropped can't come back
+        for d, i, b in sorted(dropped[:-1], key=lambda x: -x[2].value):
+            d.bullets.insert(min(i, len(d.bullets)), b)
+            if build_all(bank, to_selection(default, plan, drafts, lang), folder, [lang])[lang] > 1:
+                _remove(d, b)
+        sel = to_selection(default, plan, drafts, lang)
+        pages = build_all(bank, sel, folder, [lang])[lang]
+    return sel, pages, [f"{d.where}: {b.text[:70]}" for d, _, b in dropped
+                        if not any(x is b for x in d.bullets)]
+
+
+def _remove(d: Draft, b: Bullet) -> None:
+    d.bullets[:] = [x for x in d.bullets if x is not b]
+
+
+def fill(bank: dict, default: Selection, plan: Plan, drafts: list[Draft], lang: str) -> float:
+    """Share of the page the content takes (see cv/resume.typ)."""
+    return page_fill(resume_data(bank, to_selection(default, plan, drafts, lang), lang))
+
+
+def top_up(bank: dict, default: Selection, plan: Plan, drafts: list[Draft], lang: str, folder: Path,
+           add: Callable[[Draft], list[str]]) -> tuple[list[str], str | None]:
+    """When the page is clearly short (under FULL_ENOUGH), ask the model for one more bullet
+    at a time, from facts not used yet, on the experience that has the fewest bullets for
+    its share. A bullet with problems, or one that pushes to a second page, is taken back.
+    Returns (one line per bullet added, why it stopped early or None)."""
+    added, tried = [], set()
+    while len(added) < MAX_TOP_UP and fill(bank, default, plan, drafts, lang) < FULL_ENOUGH:
+        used = lambda d: {k for b in d.bullets for k in b.facts}                  # noqa: E731
+        targets = [d for d in drafts if d.plan.section == "experience" and d.where not in tried
+                   and len(d.bullets) < MAX_BULLETS and any(p.key not in used(d) for p in d.plan.pool)]
+        if not targets:
+            break
+        d = min(targets, key=lambda d: len(d.bullets) - d.plan.quota)          # first one on a tie
+        before = list(d.bullets)
+        try:
+            problems = add(d)
+        except Exception as e:                    # no model, over budget, network: keep the page as is
+            d.bullets[:] = before
+            return added, str(e)
+        new = [b for b in d.bullets if not any(b is x for x in before)]
+        if not new or problems:
+            d.bullets[:] = before
+            tried.add(d.where)
+            continue
+        if build_all(bank, to_selection(default, plan, drafts, lang), folder, [lang])[lang] > 1:
+            d.bullets[:] = before
+            tried.add(d.where)
+            continue
+        added.append(f"{d.where}: {new[0].text[:70]}")
+    return added, None
 
 
 # ---------- the whole thing ----------
@@ -146,6 +203,18 @@ def compose_resume(bank: dict, record: JobRecord, lang: str, folder: Path, chain
         ui.note(n)
     save_plan(folder, plan)
     sel, pages, dropped = fit_page(bank, default, plan, drafts, lang, folder)
+    if pages <= 1:
+        llm = lambda: llms[next(k for k in chain if k in llms)]              # noqa: E731
+        more, stopped = top_up(bank, default, plan, drafts, lang, folder,
+                      lambda d: add_one(bank, facts, plan.requirements, d, lang, llm(), approved,
+                                        record.job_title, "the page has room for one more bullet"))
+        for line in more:
+            ui.note(f"added to fill the page: {line}")
+        if stopped:
+            ui.note(f"could not add bullets to fill the page: {stopped}")
+        if more:
+            sel = to_selection(default, plan, drafts, lang)
+            pages = build_all(bank, sel, folder, [lang])[lang]
     if interactive is None:
         interactive = sys.stdin.isatty()
     if interactive:
