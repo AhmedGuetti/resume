@@ -13,6 +13,8 @@ bank/
   selections/default.yaml    the general-purpose resume (pdf/resume-*.pdf)
   letters/                   cover letter paragraphs, one file per entry (see letters/README.md)
   voice.md                   how I write, for the cover letter coach
+  style.md                   how my resume bullets read: the composer follows it
+  approved.yaml              bullets I accepted in reviews, reused when the same facts come up
 ```
 
 This folder is the only place resume content lives: `make` regenerates
@@ -46,7 +48,13 @@ en: **BugPredict:** designed a multi-agent bug-detection pipeline with LangGraph
 fr: **BugPredict :** conception d'un pipeline multi-agents de détection de bugs ...
 ```
 
-- Each `## id` is one bullet. The id is how a selection refers to it, so keep it stable.
+- Each `## id` is one fact (and, as written, one bullet of the general resume). Tailored
+  resumes are composed from facts: the AI merges 2-3 facts of the same project into one
+  bullet, in the style of [style.md](style.md). The id is how selections refer to it, so keep
+  it stable. One fact per block: what was done, with what, and the result.
+- `projects:` (optional, front matter) maps an id prefix to a project:
+  `{bugpredict: BugPredict, argus: ARGUS}`. Facts of different projects never share a bullet;
+  a fact matching no prefix is the entry's "general" project; no map = one project.
 - `en:` and `fr:` are both required and must each fit on one line.
 - `tags:` are free-form keywords to help match bullets to a job offer. They never appear on the resume.
 - `conflicts:` (optional) lists groups of bullets that say the same thing. At most one bullet

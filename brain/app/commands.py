@@ -139,13 +139,16 @@ command("apply", "Paste a job offer, get a tailored resume and cover letter in i
         arg("--url", help="link to the job (LinkedIn page or company site); asked if missing"),
         arg("--force", action="store_true", help="skip the already-applied checks"),
         MODEL,
-        arg("--no-fill", action="store_true", help="only keep the picked content, don't add more to fill the page"),
+        arg("--no-review", action="store_true", help="don't review the bullets entry by entry: take them as written"),
         arg("--no-score", action="store_true", help="skip the fit score and competition questions"),
         arg("--no-gaps", action="store_true", help="don't offer the gap interview"),
         arg("--only", choices=["resume", "letter"], help="just the resume or just the cover letter"),
         arg("--lang", choices=LANGS, help="language of both documents (default: the offer's)"),
         details="""
 They go in cv/company/<name>/ (French offer -> French resume and letter).
+The resume is composed from your facts: the AI matches the offer to them, a plan spreads them
+over your entries (experience before projects; Magellan, ISIS, LISA by relevance), the AI writes
+the bullets in your style (bank/style.md), and you review each entry's bullets in turn.
 Company, title, salary, date, applicants... are read from the offer into job.json;
 whatever the offer doesn't say, you're asked (Enter to skip). You're asked for the job's
 link first: if you already have that job (same link, same offer text, or same company +
@@ -155,7 +158,7 @@ an offer, that offer is reused.""", complete="company")(_apply)
 
 @command("resume", "Make or redo just the tailored resume of an application, from its saved offer",
          COMPANY, LANG, MODEL,
-         arg("--no-fill", action="store_true", help="don't add more content to fill the page"),
+         arg("--no-review", action="store_true", help="take the bullets as written, without reviewing them"),
          arg("--no-score", action="store_true", help="skip the fit score"),
          details="Same as `apply COMPANY --only resume`. After editing selection.yaml by hand, "
                  "use `build COMPANY` instead.", complete="company")
@@ -164,9 +167,22 @@ def cmd_resume(args) -> int:
         print(f'no saved offer for \'{args.company}\': start with apply "{args.company}"')
         return 1
     full = COMMANDS["apply"].parser().parse_args([args.company, "--only", "resume"])
-    for name in ("lang", "model", "no_fill", "no_score"):
+    for name in ("lang", "model", "no_review", "no_score"):
         setattr(full, name, getattr(args, name))
     return COMMANDS["apply"].run(full)
+
+
+@command("review", "Go through a tailored resume's bullets again, entry by entry",
+         COMPANY, MODEL,
+         arg("--entry", help="only this entry, e.g. magellan (default: every entry)"),
+         details="""
+Shows each entry's bullets: Enter accepts, e N edits bullet N, r N [note] rewrites it
+("r 2 shorter"), r [note] rewrites them all, d N drops, + adds one from unused facts,
+f N shows its facts. Then the page is fitted again and the PDF rebuilt. Needs a resume
+made by `apply`/`resume` (plan.json in the folder).""", complete="company")
+def cmd_review(args) -> int:
+    from ..compose.pipeline import review_application
+    return review_application(args.company, args.model, args.entry)
 
 
 def _score(args):

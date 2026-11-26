@@ -5,7 +5,6 @@ import pytest
 
 from brain.bank import BankError, Selection
 from brain.offer.record import JobRecord
-from brain.pick.ai import SelectAnswer
 
 
 # ---------- Selection: hand-written, so strict ----------
@@ -44,11 +43,6 @@ def test_bullet_ids_handles_reworded_bullets():
 
 
 # ---------- LLM answers: lenient ----------
-
-def test_select_answer_not_an_object():
-    answer, warnings = SelectAnswer.parse(["nope"])
-    assert answer == SelectAnswer() and warnings
-
 
 # ---------- job.json: open, keeps what it doesn't know ----------
 

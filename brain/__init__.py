@@ -6,6 +6,7 @@ The packages follow the path of one application:
     bank/     the content (bank/*.md) and Selection: what goes on one resume
     offer/    a job offer: its facts (checked against its text), job.json, duplicates
     pick/     the LLM chooses the content for an offer; fit it on one page
+    compose/  the tailored resume from facts: match (AI), plan (priorities), write (AI), review
     score/    how well you fit the offer, and where you stand among the applicants
     gaps/     gap interview: your answers about missing requirements -> bank bullets you approve
     render/   selection -> data -> PDF (Typst, cv/*.typ)

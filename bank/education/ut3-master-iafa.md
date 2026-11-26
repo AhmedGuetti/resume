@@ -6,6 +6,17 @@ title:
 location: Toulouse, France
 end: 2026-09
 tags: [ai, ml, computer-graphics, computer-vision, research]
+projects:                 # fact id prefix -> project: facts of different projects never share a bullet
+  tir: TIR paper
+  reid: Person re-identification
+  renderer: glTF PBR renderer
+  skinning: Skeletal animation
+  mesh: Mesh geometry
+  pnp: PnP-Flow
+  ultrasound: Ultrasound reconstruction
+  reussite: Réussite project
+  k8s: Anomaly detection on Kubernetes
+  lamport: Distributed mutual exclusion
 conflicts:                # at most one bullet of each group on a resume (enforced)
   - [tir-paper, tir-paper-short]
   - [coursework, coursework-ml]

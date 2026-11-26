@@ -38,10 +38,13 @@ class _Strict(BaseModel):
 
 
 class BulletPick(_Strict):
-    """A bullet reworded for one resume: {id: x, en: "...", fr: "..."}."""
+    """A bullet reworded for one resume: {id: x, en: "...", fr: "..."}.
+    A composed bullet (brain/compose/) also lists the facts it was written from, as
+    "section/entry/fact" keys; `id` is then its first fact."""
     id: str
     en: str | None = None
     fr: str | None = None
+    facts: list[str] | None = None
 
 
 class EntryPick(_Strict):
@@ -53,6 +56,14 @@ class EntryPick(_Strict):
 
     def bullet_ids(self) -> list[str]:
         return [b if isinstance(b, str) else b.id for b in self.bullets or []]
+
+    def fact_ids(self) -> set[str]:
+        """Every bank id this entry shows: its bullets, and the facts composed bullets cite."""
+        ids = set(self.bullet_ids())
+        for b in self.bullets or []:
+            if not isinstance(b, str) and b.facts:
+                ids |= {k.rsplit("/", 1)[-1] for k in b.facts}
+        return ids
 
 
 class SkillPick(_Strict):

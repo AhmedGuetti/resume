@@ -94,7 +94,7 @@ Skills: Python, MCP, experience with agentic systems.
 @pytest.fixture
 def applying(tmp_path, monkeypatch):
     """Runs `apply` in a temp cv/company/, with a fake model (it reads the offer's language
-    and picks nothing, so the general resume's content is kept), and the PDF build and the
+    and writes no bullets), and the PDF build and the
     letter replaced by recorders. Returns the calls: {"resume": [langs per build], "letter": [letter args]}."""
     monkeypatch.setattr(paths, "COMPANIES", tmp_path / "company")
     calls = {"resume": [], "letter": []}
@@ -118,7 +118,8 @@ def applying(tmp_path, monkeypatch):
         calls["letter"].append(args)
         return 0
 
-    monkeypatch.setattr(apply_mod, "build_all", fake_build_all)
+    from brain.compose import pipeline
+    monkeypatch.setattr(pipeline, "build_all", fake_build_all)
     monkeypatch.setattr(letter_mod, "cmd_letter", fake_letter)
 
     def run(offer_text, **options):

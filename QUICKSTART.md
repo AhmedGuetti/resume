@@ -218,6 +218,7 @@ through each paragraph with questions and ways to start. How to write each part 
 | `open acme [fr] [letter]` | open the resume PDF, or the letter |
 | `letter acme` | the cover letter, assembled from your `bank/letters/` paragraphs |
 | `resume acme` | redo just the tailored resume from the saved offer (`--lang en` for the other language) |
+| `review acme` | go through its bullets again, entry by entry: accept, edit, rewrite with a note (`--entry magellan` for one) |
 | `edit acme [letter\|selection\|offer]` | open that file in your editor; `edit bank/letters/general.md` for any file |
 | `letter acme --write` | write it paragraph by paragraph instead, with a coach |
 | `translate` | redo the French of the paragraphs whose English you changed |

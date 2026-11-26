@@ -114,7 +114,8 @@ It creates `cv/company/<company>/` with (for a French offer):
 ```
 offer.md          the offer text
 job.json          the facts of the offer (see below), including its language
-selection.yaml    what was picked and why, and what was added or dropped
+selection.yaml    the bullets (text + the facts each cites), the plan, and what was dropped
+plan.json         the plan, for `review <company>` later
 letter.md         the cover letter, each paragraph's source in a comment, to edit
 pdf/
   resume-fr.pdf   tailored resume
@@ -148,14 +149,34 @@ The company name comes from the offer, so `apply` alone is enough; `apply "Compa
 works. A new application always gets its own folder: `<company>`, or `<company>-2`, `-3`...
 if that name is taken, so an earlier application is never overwritten.
 
-**Who picks the content.** An LLM reads the offer and the bank and chooses which bullets,
-projects and skills to use, most relevant first. It only chooses: it never writes resume
-text, and any id it makes up is dropped (and reported). Bullets tagged `to-confirm` are
-never shown to it, and a bullet and its `-short` variant never end up on the same page, nor
-two bullets of a `conflicts:` group (declared in the bank file's front matter). It also
-ranks a few spare bullets, added only if the page has room left. An entry it forgets keeps
-the general resume's bullets. If no model answers at all, `apply` stops and says so: there
-is no non-AI fallback.
+**How the resume is composed** ([brain/compose/](brain/compose/__init__.py)). Each `## id`
+block of the bank is a fact, and the bullets are written for each offer from those facts:
+
+1. **Match (AI).** The model reads every fact and the offer's requirements (list-style
+   requirements like "Python, PyTorch, Kubernetes" are split into one per tool), and says which
+   facts show each one: 3 = this work *is* the requirement, 2 = it used it, 1 = adjacent.
+2. **Plan (no AI)**, with fixed priorities. Between sections they're **static**: experience,
+   then education, then projects. A project only covers what no experience shows. Inside a
+   section they're **dynamic**: each requirement goes to the entry where it was most central,
+   with the entry's rank (Magellan, ISIS, LISA: the order of `bank/selections/default.yaml`)
+   as a small bonus and a penalty for entries already carrying many requirements. So agentic
+   work lands on Magellan and PyTorch on LISA. Bullets per experience mix a base share by rank
+   with how much of the offer each answers, never fewer than 2.
+3. **Write (AI)**, in my style ([bank/style.md](bank/style.md)). Each bullet cites its facts
+   and may merge 2-3 facts *of one project* (projects come from the `projects:` map in an
+   entry's front matter). Every bullet is checked, and a failing one goes back once:
+   its facts exist, belong to one project and aren't used twice; every number and every tool
+   it names is in its facts; a fact picked for a tool the offer names ("PyTorch") must name
+   it; one line. What still fails is dropped and reported. A few more bullets than fit are
+   written, and fitting the page drops the least valuable: projects first, then education,
+   then experience above its minimum.
+4. **Review (me).** Entry by entry: Enter accepts, `e N` edits, `r N shorter` rewrites one with
+   a note, `r` rewrites all, `d N` drops, `+` adds one from unused facts, `f N` shows the facts,
+   `a` accepts the rest. Accepted bullets go in `bank/approved.yaml` and are reused when the
+   same facts come up again. `--no-review` skips it; `review <company>` does it again later.
+
+Facts tagged `to-confirm` and `-short` wordings are never used. If no model answers, `apply`
+stops and says so: there is no non-AI fallback.
 
 **Keeping the cost down.** `config.yaml` says which model does which job:
 
@@ -190,9 +211,6 @@ check it against your providers' billing pages now and then.
 make apply COMPANY="Company X" OFFER=offer.txt MODEL=deepseek:deepseek-chat   # one model for both jobs
 ```
 
-**Fitting one page.** It then drops the weakest bullets if the page overflows,
-or, if there's room left, adds the next most relevant bullets and projects one at a time,
-keeping each one that still fits on one page in both languages (`--no-fill` skips this).
 
 **Where you stand.** At the end, `apply` scores how well you fit the offer and saves it in
 `job.json`:

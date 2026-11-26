@@ -18,7 +18,7 @@ from pydantic import BaseModel, Field
 from ..bank import ENTRY_SECTIONS
 from ..llm import LLM
 from ..llm.answers import parse_json
-from ..pick.ai import bank_for_prompt
+from ..compose.facts import bank_for_prompt
 
 SYSTEM = """\
 You help a candidate grow their resume content bank. A job offer asks for a \

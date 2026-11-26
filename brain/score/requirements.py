@@ -20,7 +20,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from ..bank import ENTRY_SECTIONS, Selection, usable
 from ..llm import LLM
 from ..llm.answers import lenient_list, parse_json
-from ..pick.ai import bank_for_prompt
+from ..compose.facts import bank_for_prompt
 
 Status = Literal["met", "partial", "missing", "unclear"]
 Kind = Literal["required", "nice"]
@@ -84,7 +84,7 @@ def on_resume(bank: dict, sel: Selection | None, ev: str) -> bool:
     section, eid, bid = ev.split("/")
     for entry in sel.entries(section):
         if entry.id == eid:
-            return entry.bullets is None or bid in entry.bullet_ids()
+            return entry.bullets is None or bid in entry.fact_ids()
     return False
 
 
