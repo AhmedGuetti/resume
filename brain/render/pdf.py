@@ -48,6 +48,17 @@ def compile_pdf(template: str, data: dict, out: Path) -> int:
     return page_count(out)
 
 
+def page_fill(data: dict) -> float:
+    """How much of the page the resume's content takes before any gap is stretched
+    (cv/resume.typ's <fill>): 0.9 = a tenth of the page left over. Above 1, it overflows."""
+    try:
+        out = typst.query(str(TEMPLATES / "resume.typ"), "<fill>", field="value", one=True,
+                          root=str(ROOT), sys_inputs={"data": json.dumps(data, ensure_ascii=False)})
+    except Exception as e:
+        raise RenderError(f"Typst failed for resume: {e}") from e
+    return float(json.loads(out)["fill"])
+
+
 def page_count(pdf: Path) -> int:
     info = subprocess.run(["pdfinfo", str(pdf)], capture_output=True, text=True).stdout
     return int(re.search(r"^Pages:\s+(\d+)", info, re.M).group(1))

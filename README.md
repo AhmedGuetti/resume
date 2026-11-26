@@ -22,7 +22,7 @@ bank/              all the content, as Markdown (see bank/README.md)
 brain/             the Python side: reads the bank, picks content for an offer, builds PDFs
 config.example.yaml  copy to config.yaml (git-ignored) for the LLM model and API keys
 cv/
-  ninurta.typ      font, accent color and header, shared by the resume and the letter (Typst)
+  ninurta.typ      font, colors and header, shared by the resume and the letter (Typst)
   resume.typ       resume layout
   letter.typ       cover letter layout (cv/company/<name>/letter.md -> letter-<lang>.pdf)
   company/<name>/  tailored resumes, one folder per application (not in git)
@@ -169,7 +169,12 @@ block of the bank is a fact, and the bullets are written for each offer from tho
    it names is in its facts; a fact picked for a tool the offer names ("PyTorch") must name
    it; one line. What still fails is dropped and reported. A few more bullets than fit are
    written, and fitting the page drops the least valuable: projects first, then education,
-   then experience above its minimum.
+   then experience above its minimum. Then it fills the page back up: dropped bullets
+   that fit again come back (best first), and if the page is still under 93% full the
+   model writes up to 3 more bullets from unused facts, each checked, kept only if the
+   page stays one page. The last few lines of space are spread between entries and
+   sections by [cv/resume.typ](cv/resume.typ) (at most 6pt per gap), so the page ends
+   at the bottom margin.
 4. **Review (me).** Entry by entry: Enter accepts, `e N` edits, `r N shorter` rewrites one with
    a note, `r` rewrites all, `d N` drops, `+` adds one from unused facts, `f N` shows the facts,
    `a` accepts the rest. Accepted bullets go in `bank/approved.yaml` and are reused when the
@@ -324,7 +329,7 @@ ninurta> translate             # after rewriting English paragraphs: redo their 
 - **Result.** `cv/company/<name>/letter.md`, in the offer's language (`--lang` to change it),
   with each paragraph's source and what the AI did in a comment above it. Edit it, then
   `letter <name> --build`. It's laid out by [cv/letter.typ](cv/letter.typ), which
-  shares [cv/ninurta.typ](cv/ninurta.typ) (font, accent color, header) with the resume.
+  shares [cv/ninurta.typ](cv/ninurta.typ) (font, colors, header) with the resume.
 - `letter <name> --write` writes it paragraph by paragraph instead, with questions, ways to
   start and the checks after each one; `--skeleton` puts that guidance in `letter.md` as
   comments, for an editor; `--no-adapt` adds no sentence; `--check` only runs the checks.

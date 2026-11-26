@@ -1,7 +1,7 @@
 // letter.typ: the cover letter layout. Same font, color and header as the resume
 // (both import ninurta.typ), so a letter and a resume sent together look like a set.
 // Content comes from cv/company/<name>/letter.md through Python (python -m brain letter ...).
-#import "ninurta.typ": accent, fonts, data, rich, header
+#import "ninurta.typ": accent, rule, fonts, data, rich, header
 
 // Wider margins than the resume: a letter is read as prose, short lines read faster.
 #set page(paper: "a4", margin: (x: 0.95in, top: 0.6in, bottom: 0.8in))
@@ -12,7 +12,7 @@
 
 #header(data.profile)
 #v(0.6em)
-#line(length: 100%, stroke: 0.5pt + accent)
+#line(length: 100%, stroke: 0.6pt + rule)
 #v(1.2em)
 
 // Recipient on the left, place and date on the right, on the same line.

@@ -6,7 +6,7 @@
     write.py     3. AI: the bullets, in my style (bank/style.md), each citing its facts, checked
     review.py    I accept, edit or rewrite each entry's bullets before they go on the page
     approved.py  the bullets I accepted, reused next time (bank/approved.yaml)
-    pipeline.py  compose_resume(): all of the above, then one page
+    pipeline.py  compose_resume(): all of the above, then one full page
 
 pipeline.compose_resume() runs it all and fits the page; the result is a selection.yaml whose
 bullets carry their text and their facts, plus plan.json (for `review` later).
