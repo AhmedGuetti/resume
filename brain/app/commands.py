@@ -418,6 +418,16 @@ def cmd_show(args) -> int:
     return 0
 
 
+def _today(args):
+    from .today import cmd_today
+    return cmd_today(args)
+
+
+command("today", "The day at a glance: applications, fit, bank growth, AI cost",
+        arg("--date", group="when", help="another day, as YYYY-MM-DD"),
+        arg("--yesterday", group="when", action="store_true", help="yesterday instead of today"))(_today)
+
+
 @command("catalog", "List every entry, bullet id and skill in the bank",
          arg("--json", action="store_true", help="full machine-readable dump"))
 def cmd_catalog(args) -> int:

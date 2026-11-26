@@ -172,9 +172,10 @@ def make_resume(run: Run, record: JobRecord, offer: str, folder: Path, lang: str
         score_application(load_bank(), record, sel, run.chain("score"), run.llms, label=folder.name)
         record.save(folder / "job.json")
         print_score(record)
-        if gap_interview(run, record, folder):
-            ui.doing("Rebuilding the resume with your new bullets ...")
-            n, sel = build_resume(run, record, offer, folder, lang)
+        out = gap_interview(run, record, folder)
+        if out:
+            ui.doing("Rebuilding the resume in the same folder, with your answers on it ...")
+            n, sel = build_resume(run, record, offer, folder, lang, must_use=out.use)
             score_application(load_bank(), record, sel, run.chain("score"), run.llms,
                               label=folder.name, ask=False)
             record.save(folder / "job.json")
@@ -207,23 +208,24 @@ def build_resume(run: Run, record: JobRecord, offer: str, folder: Path, lang: st
     return n, done.sel
 
 
-def gap_interview(run: Run, record: JobRecord, folder: Path) -> bool:
+def gap_interview(run: Run, record: JobRecord, folder: Path):
     """Offers the gap interview (app/gaps.py) when the offer asks for things the bank lacks.
-    Only in a terminal, with a model, and not with --no-gaps. True if the bank grew."""
+    Only in a terminal, with a model, and not with --no-gaps. Returns its Outcome
+    (falsy when there's nothing to put on the resume), or None."""
     from .gaps import interview, to_ask
     if getattr(run.args, "no_gaps", False) or not sys.stdin.isatty():
-        return False
+        return None
     chain = run.chain("gaps")
     checks = to_ask(record, paths.BANK / "gaps.md")
     if not chain or not checks:
-        return False
+        return None
     n = len(checks)
     if not confirm(f"{n} requirement{'s' if n > 1 else ''} of this offer {'are' if n > 1 else 'is'} "
                    "missing or partial in your bank. Answer a few questions to add them?"):
-        return False
+        return None
     from ..llm import get_llm
     llm = run.llms.setdefault(chain[0], get_llm(chain[0]))
-    return bool(interview(record, llm, folder.name))
+    return interview(record, llm, folder.name)
 
 
 def make_letter(folder: Path, lang: str, args) -> int:

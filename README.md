@@ -246,13 +246,22 @@ For each one you answer in your own words:
 - **Enter** skips it, **q** stops.
 - **n** means you don't have it: a keyword you choose (e.g. `ALM Octane`) goes in `bank/gaps.md`,
   and any later requirement that mentions it isn't asked again.
-- Anything else is your answer. The AI drafts **one bank bullet from that answer only** (English,
-  French, tags, the entry it belongs to), or asks a follow-up when the answer is too vague. You
-  accept, edit the fields, ask for a change, or skip. If it's already in the bank, it says so.
+- Anything else is your answer. The AI drafts **bank bullets from that answer only**, one per
+  place you name (Docker at Magellan and at ISIS -> two separate bullets), or asks a follow-up when
+  the answer is too vague. A place the bank already covers is reused, not duplicated. You accept,
+  edit one (`e2`), drop one (`d2`), ask for a change, or skip.
+- After you accept, you're asked for **the story behind it** for your cover letter (Enter = none).
+  Tell it plainly: the situation, what you did, how it ended. The AI rewrites it as a `story`
+  paragraph in your voice (`bank/voice.md`, the rules in [LETTERS.md](LETTERS.md)), EN + FR, from
+  your words only (a number you didn't give is flagged), or asks one follow-up. Accepted, it goes in
+  `bank/letters/<entry>.md` and in this offer's `job.json` (`letter_stories`), so this offer's
+  letter uses it as its proof paragraph, and later letters can pick it too.
 
 Only an accepted draft is written: appended to the entry's file with a comment saying when and for
-which offer, checked by reloading the bank (undone if it would break it). Then the resume and the
-score are redone with it. Review everything with `git diff bank/`.
+which offer, checked by reloading the bank (undone if it would break it). Then the resume is rebuilt
+**in the same folder with those bullets on it**: they go first in their entry and are the last thing
+dropped to fit the page, so the picker can't leave out what you just answered. The score is redone
+too. Review everything with `git diff bank/`.
 
 The result is a starting point. Edit `selection.yaml` if you disagree, then rebuild:
 

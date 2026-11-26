@@ -7,7 +7,7 @@ import pytest
 
 from brain.app.commands import cmd_build
 from brain.bank import BankError, Selection
-from brain.bank.loader import Entry, load_entry
+from brain.bank.loader import load_entry
 from brain.paths import DEFAULT_SELECTION
 
 BULLETS = "".join(f"## {b}\ntags: x\nen: {b} text\nfr: {b} texte\n\n"

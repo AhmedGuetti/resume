@@ -63,6 +63,23 @@ def first_picks(paras: dict[str, LetterParagraph], style: Style, lang: str) -> d
     return picks
 
 
+def prefer_stories(picks: dict[str, str], paras: dict[str, LetterParagraph], style: Style,
+                   lang: str, keys: list[str]) -> list[str]:
+    """Put the paragraphs told for this offer (job.json letter_stories, from the gap
+    interview) in their slot, latest first wins. Returns the keys used."""
+    used = []
+    for key in reversed(keys):
+        para = paras.get(key)
+        if para is None or not para.fits(style.id) or not text_in(para, lang):
+            continue
+        slot = next((s for s in style.paragraphs if s.fill == para.kind
+                     and picks.get(s.id) not in used), None)
+        if slot is not None:
+            picks[slot.id] = key
+            used.append(key)
+    return used
+
+
 PICK_SYSTEM = """\
 You assemble a cover letter from paragraphs the candidate wrote in advance. For each slot, \
 choose the paragraph that best answers the job offer below. Prefer the story whose project is \

@@ -214,7 +214,7 @@ through each paragraph with questions and ways to start. How to write each part 
 | `list` | all your applications, newest first, with fit score and verdict |
 | `show acme` | the facts saved from that offer, and the score |
 | `score acme` | update the applicant numbers and re-score |
-| `gaps acme` | questions about that offer's missing requirements; your answers become bank bullets you approve |
+| `gaps acme` | questions about that offer's missing requirements; your answers become bank bullets you approve, and your stories cover letter paragraphs |
 | `open acme [fr] [letter]` | open the resume PDF, or the letter |
 | `letter acme` | the cover letter, assembled from your `bank/letters/` paragraphs |
 | `resume acme` | redo just the tailored resume from the saved offer (`--lang en` for the other language) |
@@ -231,6 +231,7 @@ through each paragraph with questions and ways to start. How to write each part 
 | `catalog` | every entry, bullet id and skill in your bank |
 | `model deepseek:deepseek-chat` | that model for this session (`model config` to undo) |
 | `cost` / `usage` | what the AI cost this session / today / this month |
+| `today` | the day at a glance: new applications with fit and verdict, bank bullets added, AI cost (`--yesterday`, `--date 2026-11-24`) |
 | `help` | all commands |
 
 Everything also works outside the shell:

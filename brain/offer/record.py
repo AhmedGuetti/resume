@@ -93,6 +93,7 @@ class JobRecord(_Open):
     fit: FitScore | None = None                              # how well you match (score/)
     competition: list[Snapshot] = Field(default_factory=list)   # applicants over time, oldest first
     position: Position | None = None                         # verdict from fit + latest snapshot
+    letter_stories: list[str] = Field(default_factory=list)  # bank/letters stories told for this offer (gaps)
 
     @field_validator("experience_years", "education", "start_date", "duration", "seniority",
                      mode="before")

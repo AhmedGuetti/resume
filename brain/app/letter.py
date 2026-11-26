@@ -23,7 +23,7 @@ from ..errors import RenderError
 from ..letter.coach import (ai_starters, all_bullets, all_skills, company_material, polish,
                             proof_material, top_project)
 from ..letter.assemble import (Slot, adapt, candidates, draft_why, fill_values, first_picks,
-                               pick_with_llm, translate)
+                               pick_with_llm, prefer_stories, translate)
 from ..letter.document import Letter, build_letter, letter_path
 from ..letter.paragraphs import en_hash, load_files, load_paragraphs, save_file
 from ..letter.lint import check_letter, check_paragraph, words
@@ -442,6 +442,12 @@ def assemble_letter(args, folder, record, offer, bank, styles, lang, suggestion,
             return got, ("bad picks" if len(warnings) >= 2 else None)
         ui.doing(f"Picking paragraphs with {chain[0]} ...")
         picks.update(run_with_fallback("letter", chain, attempt, llms, label=folder.name) or {})
+    told = record.letter_stories if record else []
+    for key in prefer_stories(picks, paras, style, lang, told):
+        print(ui.dim(f"   using your story from the gap interview: {key}"))
+    missing = [k for k in told if k not in paras]
+    if missing:
+        ui.note(f"stories in job.json no longer in bank/letters/: {', '.join(missing)}")
     if tty:
         picks = review_picks(style, picks, paras, lang)
 

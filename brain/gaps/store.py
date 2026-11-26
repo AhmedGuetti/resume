@@ -124,6 +124,5 @@ def remember_no(keyword: str, source: str, path: Path = GAPS_FILE) -> None:
     keyword = _one_line(keyword)
     if not keyword:
         return
-    text = path.read_text(encoding="utf-8") if path.exists() else GAPS_HEADER
-    path.write_text(text.rstrip("\n") + f"\n- {keyword}  ({source}, {date.today().isoformat()})\n",
-                    encoding="utf-8")
+    text = path.read_text(encoding="utf-8").rstrip("\n") + "\n" if path.exists() else GAPS_HEADER
+    path.write_text(text + f"- {keyword}  ({source}, {date.today().isoformat()})\n", encoding="utf-8")
