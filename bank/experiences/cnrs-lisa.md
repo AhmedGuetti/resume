@@ -67,7 +67,7 @@ en: Built a Python → AWK → Excel pipeline that made model errors readable fo
 fr: Pipeline Python → AWK → Excel rendant les erreurs du modèle lisibles pour les linguistes.
 
 ## lisa-results
-tags: evaluation, metrics, impact, data-quality
+tags: highlight, evaluation, metrics, impact, data-quality
 en: Raised the model's precision from about 0.90 to 0.96 by fixing the data, leaving only cases still debated among Corsican linguists.
 fr: Fait passer la précision du modèle d'environ 0,90 à 0,96 en corrigeant les données, les erreurs restantes portant sur des cas encore débattus par les linguistes corses.
 

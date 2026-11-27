@@ -8,7 +8,7 @@ from brain.compose.approved import Approved
 from brain.compose.facts import GENERAL, load_facts, unsupported
 from brain.compose.match import Match, Requirement, read_answer, split_list
 from brain.compose.pipeline import MAX_TOP_UP, drafts_from, drop_order, fit_page, to_selection, top_up
-from brain.compose.plan import MIN_BULLETS, make_plan
+from brain.compose.plan import MIN_BULLETS, is_term, make_plan
 from brain.compose.review import Tools, review
 from brain.compose.write import Bullet, Draft, check, compose, repeated_openers, serious, voice_problems
 from brain.render.resume import resume_data
@@ -70,6 +70,16 @@ def _plan(bank, facts, default_sel, *reqs):
                      default_sel)
 
 
+@pytest.mark.parametrize("text, term", [
+    ("PyTorch", True), ("SQL and databases", True), ("Hugging Face", True),
+    ("Build and ship", False), ("Partner with teams", False), ("Measure impact", False),
+    ("Make it stick", False), ("Redesign processes", False),
+    ("Strong knowledge of Python", False),                     # too long to name word for word
+])
+def test_only_skills_must_be_named_not_the_offers_verbs(text, term):
+    assert is_term(text) is term
+
+
 def test_experience_beats_a_project_statically(bank, facts, default_sel):
     plan = _plan(bank, facts, default_sel, ("AI coding tools", "required", [(NINURTA, 3), (ATAS, 2)]))
     assert plan.assigned[0] == ATAS
@@ -91,6 +101,19 @@ def test_a_conflict_keeps_the_fact_that_answers_more_of_the_offer(bank, facts, d
     assert plan.assigned[1] == mcp                                       # its requirement moved over
     kept = next(p for p in plan.entry(MAG).pool if p.key == mcp)
     assert 1 in kept.covers and "reusable libraries" not in kept.terms
+
+
+def test_highlights_are_always_in_their_experience(bank, facts, default_sel):
+    """Strong results (`highlight` tag) rarely match a requirement word for word: they are
+    added to their entry's pool anyway, as must-use facts, at most two per entry."""
+    plan = _plan(bank, facts, default_sel, ("Kotlin", "required", [(BP, 2)]))
+    mag = plan.entry(MAG)
+    picked = {p.key: p for p in mag.pool}
+    for key in (f"{MAG}/bugpredict-time", f"{MAG}/bugpredict-vs-testers"):
+        assert key in picked and picked[key].must and picked[key].value > 0
+    lisa = plan.entry("experience/cnrs-lisa")
+    assert any(p.key.endswith("lisa-results") and p.must for p in lisa.pool)
+    assert sum(1 for p in mag.pool if "highlight" in facts[p.key].tags) <= 2
 
 
 def test_a_conflict_drops_requirements_the_survivor_cannot_show(bank, facts, default_sel):
@@ -180,7 +203,7 @@ def test_compose_sends_failures_back_once_then_drops_them(bank, facts, default_s
         {"text": "Built BugPredict on Kubernetes for 40 teams.", "facts": [MCP]}]}]}
     still_bad = {"entries": [{"entry": MAG, "bullets": [
         {"text": "Built **BugPredict**, a multi-agent LangGraph system; used by 3 teams.", "facts": [BP]},
-        {"text": "Connected the agents to Jira and Confluence for 40 teams.", "facts": [MCP]}]}]}
+        {"text": "Connected the agents to Jira and Confluence for 40 teams.", "facts": [LISA]}]}]}
     llm = Scripted(bad, still_bad)
     drafts, notes = compose(bank, facts, plan, "en", llm, Approved(tmp_path / "a.yaml"), "AI Engineer")
     assert [b.facts for b in drafts[0].bullets] == [[BP]]
@@ -200,10 +223,16 @@ def test_compose_sends_failures_back_once_then_drops_them(bank, facts, default_s
     ("Added Pydantic validation to enforce strict schemas despite model randomness.", "en", "despite"),
     ("Leveraged LangGraph to build a robust pipeline.", "en", "leverag, robust"),
     ("Conçu un pipeline robuste permettant de traiter les comptes rendus.", "fr", "robuste, permettant de"),
+    ("Build and ship as main developer in a team of 3.", "en", "present tense"),
+    ("Partner with teams of doctors and researchers.", "en", "present tense"),
+    ("Tracks each application from offer to answer.", "en", "present tense"),
+    ("Développer un pipeline d'extraction pour les comptes rendus.", "fr", "infinitif"),
 ])
 def test_voice_problems_catch_machine_written_turns(text, lang, smell):
     found = " ".join(voice_problems(text, lang))
-    assert found.startswith("style:") and all(s in found for s in smell.split(", "))
+    assert found.startswith(("style:", "tense:")) and all(s in found for s in smell.split(", "))
+    if "present tense" in smell or "infinitif" in smell:
+        assert serious(voice_problems(text, lang))          # wrong tense: not kept as written
 
 
 @pytest.mark.parametrize("text, lang", [
@@ -233,6 +262,19 @@ def test_repeated_openers_on_the_resume_and_in_an_entry(bank, facts, default_sel
     assert any("also starts with" in p for p in check(two[1], ep, facts, bank, "en", two))
 
 
+def test_a_bullet_that_still_fails_falls_back_to_its_facts_words(bank, facts, default_sel, tmp_path):
+    plan = _plan(bank, facts, default_sel, ("LangGraph", "required", [(BP, 3)]))
+    plan.entries = [plan.entry(MAG)]
+    plan.entries[0].quota = 2
+    twice = {"entries": [{"entry": MAG, "bullets": [
+        {"text": "Built **BugPredict**, a LangGraph multi-agent system now used by 3 teams.", "facts": [BP]},
+        {"text": "Connected the agents to Jira and Confluence for 40 teams.", "facts": [MCP]}]}]}
+    drafts, notes = compose(bank, facts, plan, "en", Scripted(twice, twice), Approved(tmp_path / "a.yaml"), None)
+    assert [b.facts for b in drafts[0].bullets] == [[BP], [MCP]]
+    assert drafts[0].bullets[1].text == facts[MCP].text["en"]               # the bank's own words
+    assert any("fact's own words" in n for n in notes)
+
+
 def test_approved_bullets_are_offered_back(bank, facts, default_sel, tmp_path):
     approved = Approved(tmp_path / "a.yaml")
     approved.add([BP], "en", "My own BugPredict line.", edited=True)
@@ -250,13 +292,17 @@ def test_drop_order_projects_then_education_then_extra_experience(bank, facts, d
     plan = _plan(bank, facts, default_sel, ("AI coding tools", "required", [(NINURTA, 3)]))
     drafts = []
     for ep in plan.entries:
-        n = {"experience": 3, "education": 2, "projects": 1}[ep.section]
+        n = {"experience": 3, "education": 2, "projects": 2}[ep.section]
         drafts.append(Draft(ep, [Bullet(f"{ep.entry} {i}", [p.key], value=float(i))
                                  for i, p in zip(range(n), ep.pool)]))
     order = [(d.plan.section, i) for d, i in drop_order(drafts)]
     sections = [s for s, _ in order]
     assert sections[0] == "projects" and sections.index("education") < sections.index("experience")
     assert sum(1 for s in sections if s == "experience") == 3 * (3 - MIN_BULLETS)
+    projects = [d for d in drafts if d.plan.section == "projects" and d.bullets]
+    dropped = sum(1 for s in sections if s == "projects")
+    assert dropped == sum(len(d.bullets) for d in projects) - 1        # the best project keeps one
+    assert all(d is not projects[0] or i != 1 for d, i in drop_order(drafts))
 
 
 def _drafts(plan, n):

@@ -30,7 +30,7 @@ from ..render.resume import plain
 from .approved import Approved
 from .facts import Fact, unsupported
 from .match import Requirement
-from .plan import EntryPlan, Plan
+from .plan import PRESENT_VERBS, EntryPlan, Plan
 
 STYLE_FILE = BANK / "style.md"
 MAX_CHARS = {"en": 190, "fr": 210}          # checked: longer is "too long" (past two lines)
@@ -53,7 +53,9 @@ from the same entry AND the same project. Never combine facts of two projects.
 - Facts marked "must" have to be cited by one of the bullets. Use the other facts to make a \
 bullet stronger or to reach the number of bullets asked; never cite a fact twice.
 - When a fact supports it, use the offer's own words for the same thing (the requirements \
-listed with the fact), so the resume matches what the offer asks.
+listed with the fact), so the resume matches what the offer asks. Borrow its nouns and skills, \
+never its verbs: the work is done, so bullets start with a past tense ("Built", "Led", \
+"Measured"), even when the offer says "Build", "Partner with" or "Measure impact".
 - Numbers, tools and names only from the cited facts. Keep each bullet within max_characters_per_bullet: count the characters.
 - Every bullet says what was done. A fact that only lists tools (a "stack") is never a \
 bullet of its own: cite it together with a fact of the same project about the work, and \
@@ -192,6 +194,17 @@ AI_WORDS = {
            "diverses ", "en vue de", "synergie"],
 }
 MAX_SAME_OPENER = 2                          # times one first word may start a bullet on a resume
+# A bullet about past work starts with a past tense ("Built"), never the offer's own present
+# tense ("Build and ship...", "Partner with...", "Measure impact..."). English: PRESENT_VERBS
+# (plan.py) in their base or -s form; French: an infinitive ("Développer") instead of a past
+# participle.
+
+
+def _present_opener(word: str, lang: str) -> bool:
+    w = word.lower()
+    if lang == "fr":
+        return len(w) > 4 and w.endswith(("er", "ir")) and w not in {"premier", "dernier"}
+    return w in PRESENT_VERBS or (w.endswith("s") and w[:-1] in PRESENT_VERBS)
 
 
 def opener(text: str) -> str:
@@ -215,6 +228,14 @@ def voice_problems(text: str, lang: str) -> list[str]:
         if group.count(",") >= 2:
             out.append("style: a list of tools in brackets: name the one or two that matter")
             break
+    first = opener(text)
+    if first and _present_opener(first, lang):
+        # "tense:", not "style:": wrong for past work, so after its retry the bullet falls
+        # back to its fact's own words rather than staying on the page as written
+        out.append(f"tense: starts with \"{first}\", a present tense: say what was done "
+                   "(\"Built\", not \"Build\")" if lang == "en" else
+                   f"tense: commence par l'infinitif \"{first}\" : utiliser le participe passé "
+                   "(\"Développé\", pas \"Développer\")")
     # Lowercase only: "Plug-and-Play methods" (a paper's method) is a name, "plug-and-play" filler.
     sentence = flat[:1].lower() + flat[1:]
     found = [w.strip() for w in AI_WORDS.get(lang, []) if w in sentence]
@@ -290,12 +311,32 @@ def repair(bank, facts, reqs, drafts: list[Draft], lang, llm, approved, title) -
         kept = []
         for b in d.bullets:
             bad = serious(b.problems)
+            if bad and _fall_back(b, d, facts, bank, lang, kept):
+                notes.append(f"{d.where}: used the fact's own words instead of \"{b.text[:50]}...\" "
+                             f"({'; '.join(bad)})")
+                bad = []
             if bad:
                 notes.append(f"{d.where}: dropped \"{b.text[:60]}...\" ({'; '.join(bad)})")
             else:
                 kept.append(finish(b, d.plan))
         d.bullets = kept
     return notes
+
+
+def _fall_back(b: Bullet, d: Draft, facts, bank, lang, kept: list[Bullet]) -> bool:
+    """A bullet that still fails after its retry: rewrite it as the bank text of the first
+    fact it cites, if that fact belongs here and isn't used yet. The bank's facts are written
+    in my style, so the work stays on the page instead of being dropped."""
+    used = {k for o in kept for k in o.facts}
+    for k in b.facts:
+        f = facts.get(k)
+        if f is None or f.where != d.where or k in used:
+            continue
+        b.text, b.facts = f.text[lang], [k]
+        b.problems = check(b, d.plan, facts, bank, lang, kept + [b])
+        # the fact's own words can't be asked to name the offer's terms: the fact is the proof
+        return not [p for p in serious(b.problems) if not p.startswith("doesn't name")]
+    return False
 
 
 def redo(bank, facts, reqs, d: Draft, lang, llm, approved, title, which: int | None,

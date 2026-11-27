@@ -87,11 +87,15 @@ def to_selection(default: Selection, plan: Plan, drafts: list[Draft], lang: str)
 
 def drop_order(drafts: list[Draft]) -> list[tuple[Draft, int]]:
     """Bullets that may go, first to go first: projects, then education beyond its first
-    bullet, then experience beyond MIN_BULLETS; the least valuable first in each."""
+    bullet, then experience beyond MIN_BULLETS; the least valuable first in each. The best
+    project (the plan's first, the one closest to the offer) keeps one bullet, so the page
+    never loses its Projects section to fitting."""
     rank = {"projects": 0, "education": 1, "experience": 2}
+    best_project = next((d for d in drafts if d.plan.section == "projects" and d.bullets), None)
     cands = []
     for d in drafts:
-        keep = {"experience": MIN_BULLETS, "education": 1, "projects": 0}[d.plan.section]
+        keep = {"experience": MIN_BULLETS, "education": 1,
+                "projects": 1 if d is best_project else 0}[d.plan.section]
         best_first = sorted(range(len(d.bullets)), key=lambda i: -d.bullets[i].value)
         for i in best_first[keep:]:
             cands.append((rank[d.plan.section], d.bullets[i].value, -i, d, i))

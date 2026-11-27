@@ -131,7 +131,7 @@ en: Added a custom debugger and structured logging, so failures show an error pa
 fr: Ajouté un débogueur sur mesure et une journalisation structurée, pour que les erreurs affichent une page dédiée et soient écrites dans les logs du serveur.
 
 ## easyrmm-results
-tags: performance, maintainability, impact, refactoring, testing
+tags: highlight, performance, maintainability, impact, refactoring, testing
 en: Cut the time to find and fix bugs by 60% and page load time by 40%, added unit tests on critical functions, and brought the technical documentation up to date.
 fr: Réduit de 60 % le temps de correction des bugs et de 40 % le temps de chargement, ajouté des tests unitaires et remis à jour la documentation technique.
 

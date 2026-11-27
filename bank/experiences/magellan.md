@@ -161,12 +161,12 @@ en: On BigVul, every bug BugPredict flagged was real (precision 1.0), though it 
 fr: Sur BigVul, chaque bug signalé par BugPredict était réel (précision 1,0), même s'il n'en trouvait qu'environ un quart (rappel 0,235).
 
 ## bugpredict-time
-tags: productivity, evaluation, impact, qa, agents
+tags: highlight, productivity, evaluation, impact, qa, agents
 en: Cut the search for spec-vs-code inconsistencies from about 25 hours of tester work to 1 hour with the first version, then 35 minutes with the second.
 fr: Réduit la recherche d'incohérences entre spécifications et code d'environ 25 heures de travail de testeur à 1 heure avec la première version, puis 35 minutes avec la seconde.
 
 ## bugpredict-vs-testers
-tags: evaluation, impact, qa, benchmarking
+tags: highlight, evaluation, impact, qa, benchmarking
 en: Found about 10% more inconsistencies than testers checking the specs by hand, on 3 real projects.
 fr: Trouvé environ 10 % d'incohérences de plus que des testeurs vérifiant les spécifications à la main, sur 3 projets réels.
 
