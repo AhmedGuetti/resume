@@ -239,8 +239,14 @@ make apply COMPANY="Company X" OFFER=offer.txt MODEL=deepseek:deepseek-chat   # 
   a prediction.
 
 The numbers change: run `python -m brain score company-x` (or `score company-x` in the shell) to update the
-competition and re-score. `list` shows every application's fit and verdict, `show` the details.
+competition and re-score. `list` shows every application's fit, status and verdict, `show` the details.
 `apply --no-score` skips this step.
+
+**Where it went.** `status company-x applied` (or `interview`, `offer`, `withdrawn`, `ghosted`) records each step
+in its `job.json`, dated, with an optional `--note`; `rejected company-x` is the shortcut for a rejection
+email. Use the folder name or the company's name; when you applied to several posts there, add
+`--post` (part of the job title) or pick from the list. `status company-x` alone shows the history;
+`today` and the web page show the changes.
 
 ### Growing the bank from the gaps
 

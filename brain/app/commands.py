@@ -363,12 +363,49 @@ def cmd_edit(args) -> int:
     return 0
 
 
+# ---------- where an application stands ----------
+
+POST = arg("--post", help="part of the job title, when you applied to several posts at the company")
+WHEN = arg("--date", help="when it happened, as YYYY-MM-DD (default: today)")
+NOTE = arg("--note", help="a line to keep with it, e.g. who wrote or why")
+
+
+@command("status", "Where an application stands: show its history, or record a new step",
+         arg("company", help="folder name or company name (see `list`)"),
+         arg("status", nargs="?", choices=["applied", "interview", "offer", "rejected", "withdrawn", "ghosted"],
+             help="the new status; leave out to see the history"),
+         POST, WHEN, NOTE,
+         details="""
+  status hp                          the history so far
+  status hp applied                  sent today
+  status hp interview --note "call with the AI Lab lead" --date 2026-12-03
+A company name works too; with several posts there, add --post or pick from the list.""",
+         complete="company")
+def cmd_status(args) -> int:
+    from .status import run
+    return run(args.company, args.status, args.post, args.date, args.note)
+
+
+@command("rejected", "The company turned you down: record it (same as `status COMPANY rejected`)",
+         arg("company", help="folder name or company name (see `list`)"),
+         POST, WHEN, NOTE,
+         details="""
+  rejected hp
+  rejected niji --post data --note "generic email, no feedback"
+  rejected acme --date 2026-11-20""",
+         complete="company")
+def cmd_rejected(args) -> int:
+    from .status import run
+    return run(args.company, "rejected", args.post, args.date, args.note)
+
+
 # ---------- looking around ----------
 
 @command("list", "Your applications, newest first, with their PDFs, fit score and verdict",
          details="cv = resume, lt = letter.")
 def cmd_list(args) -> int:
     from ..offer.record import JobRecord
+    from .status import COLOR
     folders = [paths.COMPANIES / c for c in companies()]
     if not folders:
         print('No applications yet. Start with: apply "Company name"')
@@ -387,8 +424,10 @@ def cmd_list(args) -> int:
         score = (ui.paint(f"fit {total:>3}", ui.level_color(total / 100)) if total is not None
                  else ui.dim("fit   -"))
         verdict = ui.verdict(record.position.verdict) if record and record.position else ""
+        state = record.application.status if record else ""
+        state = COLOR.get(state, lambda t: t)(f"{state:<12}")
         print(f"  {ui.dim(f'{when:%Y-%m-%d %H:%M}')}  {ui.bold(f'{folder.name:<30}')} "
-              f"{' '.join(docs) or '(no PDF)':<13} {score}  {verdict}")
+              f"{' '.join(docs) or '(no PDF)':<13} {score}  {state} {verdict}")
     return 0
 
 
@@ -413,7 +452,9 @@ def cmd_show(args) -> int:
     for name in ("skills_required", "skills_nice_to_have", "responsibilities", "benefits"):
         if getattr(record, name):
             print(f"   {name}: " + "; ".join(getattr(record, name)))
-    print(f"   status      {record.application.status}")
+    history = record.application.history
+    since = f" (since {history[-1].date})" if history else ""
+    print(f"   status      {record.application.status}{since}   history: status {args.company}")
     print_score(record)
     return 0
 

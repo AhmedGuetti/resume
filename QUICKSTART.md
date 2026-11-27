@@ -211,7 +211,9 @@ through each paragraph with questions and ways to start. How to write each part 
 |---|---|
 | `apply` | paste an offer, get a tailored resume and cover letter in the offer's language |
 | `apply --only resume` | just the resume (`--only letter`: just the letter; `--lang en` forces English) |
-| `list` | all your applications, newest first, with fit score and verdict |
+| `list` | all your applications, newest first, with fit score, status and verdict |
+| `rejected acme` | they turned you down: record it, dated today (`--note "no feedback"`, `--date 2026-11-20`; `--post data` when you applied to several posts there) |
+| `status acme [applied\|interview\|offer\|rejected\|withdrawn\|ghosted]` | record where it stands, or with no status, show its history; a company name works too |
 | `show acme` | the facts saved from that offer, and the score |
 | `score acme` | update the applicant numbers and re-score |
 | `gaps acme` | questions about that offer's missing requirements; your answers become bank bullets you approve, and your stories cover letter paragraphs |
