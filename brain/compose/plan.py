@@ -97,6 +97,12 @@ def make_plan(bank: dict, facts: dict[str, Fact], match: Match, default: Selecti
     picks: dict[str, Pick] = {}
     load: dict[tuple[str, str], int] = {}
     plan = Plan([], match.requirements, dict(match.skills))
+    # Every requirement each fact was linked to, with its strength: settles conflicts below.
+    reach: dict[str, dict[int, int]] = {}
+    for req in match.requirements:
+        for k, s in req.facts:
+            if k in facts:
+                reach.setdefault(k, {})[req.index] = max(s, reach.get(k, {}).get(req.index, 0))
 
     # 1. Each requirement to one fact: section first (static), then entry (dynamic).
     for req in sorted(match.requirements, key=lambda r: (-r.weight, r.index)):
@@ -151,11 +157,11 @@ def make_plan(bank: dict, facts: dict[str, Fact], match: Match, default: Selecti
     for i, eid in enumerate(exps):
         share = 0.6 * base_share(i) / total_base + (0.4 * rel[eid] / total_rel if total_rel else 0.4 * base_share(i) / total_base)
         quota = max(MIN_BULLETS, min(MAX_BULLETS, round(EXPERIENCE_BULLETS * share)))
-        plan.entries.append(_entry_plan(bank, facts, "experience", eid, quota, picks, related))
+        plan.entries.append(_entry_plan(bank, facts, plan, reach, "experience", eid, quota, picks, related))
 
     for eid in [p.id for p in default.education if p.id in bank["education"]]:
         covers = sum(len(p.covers) for k, p in picks.items() if facts[k].where == f"education/{eid}")
-        plan.entries.append(_entry_plan(bank, facts, "education", eid,
+        plan.entries.append(_entry_plan(bank, facts, plan, reach, "education", eid,
                                         EDUCATION_BULLETS + (1 if covers >= 2 else 0), picks, related))
 
     def project_value(e):        # what it covers, then what the model linked it to
@@ -164,7 +170,8 @@ def make_plan(bank: dict, facts: dict[str, Fact], match: Match, default: Selecti
     useful.sort(key=lambda e: -project_value(e))
     for eid in useful[:MAX_PROJECTS]:
         covers = sum(len(p.covers) for k, p in picks.items() if facts[k].where == f"projects/{eid}")
-        plan.entries.append(_entry_plan(bank, facts, "projects", eid, 2 if covers >= 2 else 1, picks, related))
+        plan.entries.append(_entry_plan(bank, facts, plan, reach, "projects", eid, 2 if covers >= 2 else 1,
+                                        picks, related))
 
     # 3. Skills: the gap interview's skills first.
     for label in must_use or []:
@@ -177,11 +184,22 @@ def make_plan(bank: dict, facts: dict[str, Fact], match: Match, default: Selecti
     return plan
 
 
-def _entry_plan(bank, facts, section, eid, quota, picks, related) -> EntryPlan:
+def _entry_plan(bank, facts, plan, reach, section, eid, quota, picks, related) -> EntryPlan:
     """The entry's pool: assigned facts by value, then related facts, then the rest of the
     entry in bank order (the bank's first facts are its main ones). Facts that may not sit
-    together (a `conflicts:` group) are kept out once one of them is in."""
+    together (a `conflicts:` group) are kept out once one of them is in.
+
+    When two ASSIGNED facts clash, the one that answers more of the offer stays (its reach:
+    every requirement the model linked it to, by weight and strength), not just the one that
+    won its own requirement; a must-use fact always stays. It takes over the other's
+    requirements it was linked to too; the rest go back to uncovered, so nothing is
+    claimed that no bullet will show."""
     entry = bank[section][eid]
+    weight = {r.index: r.weight for r in plan.requirements}
+
+    def breadth(key):
+        return sum(weight.get(i, 0) * s for i, s in reach.get(key, {}).items())
+
     mine = [f for f in facts.values() if f.section == section and f.entry == eid]
     assigned = sorted((picks[f.key] for f in mine if f.key in picks), key=lambda p: -p.value)
     others = sorted((f for f in mine if f.key not in picks),
@@ -189,9 +207,19 @@ def _entry_plan(bank, facts, section, eid, quota, picks, related) -> EntryPlan:
     pool, ids = [], []
     for p in assigned:
         fid = facts[p.key].id
-        if not entry.clash(fid, ids):
+        other = entry.clash(fid, ids)
+        if other is None:
             pool.append(p)
             ids.append(fid)
+            continue
+        at = ids.index(other)
+        q = pool[at]
+        p_first = (p.value >= FORCED) > (q.value >= FORCED) or (
+            (p.value >= FORCED) == (q.value >= FORCED) and breadth(p.key) > breadth(q.key))
+        win, lose = (p, q) if p_first else (q, p)
+        _take_over(win, lose, plan, reach, weight)
+        if win is p:
+            pool[at], ids[at] = p, fid
     for f in others:
         if len(pool) >= max(quota * POOL, len(assigned)):
             break
@@ -199,3 +227,21 @@ def _entry_plan(bank, facts, section, eid, quota, picks, related) -> EntryPlan:
             pool.append(Pick(f.key, value=related.get(f.key, 0)))
             ids.append(f.id)
     return EntryPlan(section, eid, quota, pool)
+
+
+def _take_over(win: Pick, lose: Pick, plan: Plan, reach: dict[str, dict[int, int]],
+               weight: dict[int, int]) -> None:
+    """`lose` won't be on the page: `win` answers the requirements of `lose` it is linked to;
+    the others are left uncovered. `lose`'s short terms aren't carried: `win`'s text may not
+    name them."""
+    linked = reach.get(win.key, {})
+    for i in lose.covers:
+        if i in linked:
+            if i not in win.covers:
+                win.covers.append(i)
+                win.value += weight.get(i, 0) * linked[i]
+            plan.assigned[i] = win.key
+        elif plan.assigned.get(i) == lose.key:
+            del plan.assigned[i]
+    win.must = win.must or lose.must
+    lose.covers = []

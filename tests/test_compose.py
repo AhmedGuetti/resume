@@ -77,6 +77,32 @@ def test_experience_beats_a_project_statically(bank, facts, default_sel):
     assert not ninurta or not any(p.must for p in ninurta[0].pool)
 
 
+def test_a_conflict_keeps_the_fact_that_answers_more_of_the_offer(bank, facts, default_sel):
+    """The HP case: easytalk-stack won "Hugging Face" alone and pushed out easytalk-models,
+    the fine-tuning fact linked to three requirements. Now models stays and takes over."""
+    stack, models = "experience/isis-champollion/easytalk-stack", "experience/isis-champollion/easytalk-models"
+    plan = _plan(bank, facts, default_sel,
+                 ("machine learning", "required", [(models, 2)]),
+                 ("Hugging Face", "required", [(stack, 3), (models, 2)]),
+                 ("evaluation", "required", [(f"{MAG}/bugpredict-eval-protocol", 3), (models, 3)]))
+    pool = [p.key for p in plan.entry("experience/isis-champollion").pool]
+    assert models in pool and stack not in pool
+    assert plan.assigned[0] == models and plan.assigned[1] == models     # Hugging Face moved over
+    kept = next(p for p in plan.entry("experience/isis-champollion").pool if p.key == models)
+    assert set(kept.covers) >= {0, 1} and "Hugging Face" not in kept.terms
+
+
+def test_a_conflict_drops_requirements_the_survivor_cannot_show(bank, facts, default_sel):
+    stack, models = "experience/isis-champollion/easytalk-stack", "experience/isis-champollion/easytalk-models"
+    plan = _plan(bank, facts, default_sel,
+                 ("fine-tuning", "required", [(models, 3)]),
+                 ("LLM benchmarking", "required", [(models, 3)]),
+                 ("HeidelTime", "required", [(stack, 2)]))               # models isn't linked to it
+    pool = [p.key for p in plan.entry("experience/isis-champollion").pool]
+    assert models in pool and stack not in pool
+    assert 2 not in plan.assigned and plan.uncovered()[0].text == "HeidelTime"
+
+
 def test_a_project_covers_what_no_experience_shows(bank, facts, default_sel):
     plan = _plan(bank, facts, default_sel, ("AI coding tools", "required", [(NINURTA, 3), (ATAS, 1)]))
     assert plan.assigned[0] == NINURTA
