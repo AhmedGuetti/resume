@@ -253,7 +253,7 @@ def compose(bank: dict, facts: dict[str, Fact], plan: Plan, lang: str, llm: LLM,
             title: str | None) -> tuple[list[Draft], list[str]]:
     """Every entry's bullets, checked. Returns (drafts in plan order, notes)."""
     requests = [entry_request(bank, facts, ep, plan.requirements, lang, approved, ep.quota)
-                for ep in plan.entries]
+                for ep in plan.entries if ep.quota > 0]          # 0: a degree shown without bullets
     answer = ask_model(llm, lang, title, requests)
     drafts = [Draft(ep, answer.get(ep.where, [])) for ep in plan.entries]
     notes = repair(bank, facts, plan.requirements, drafts, lang, llm, approved, title)

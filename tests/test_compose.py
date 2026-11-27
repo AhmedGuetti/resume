@@ -78,29 +78,30 @@ def test_experience_beats_a_project_statically(bank, facts, default_sel):
 
 
 def test_a_conflict_keeps_the_fact_that_answers_more_of_the_offer(bank, facts, default_sel):
-    """The HP case: easytalk-stack won "Hugging Face" alone and pushed out easytalk-models,
-    the fine-tuning fact linked to three requirements. Now models stays and takes over."""
-    stack, models = "experience/isis-champollion/easytalk-stack", "experience/isis-champollion/easytalk-models"
+    """The HP case: one fact won a single requirement and pushed out a conflicting fact linked
+    to three. Now the broader one stays and takes over. (Magellan: bugpredict-mcp and
+    bugpredict-atlassian-lib may not sit together.)"""
+    lib, mcp = f"{MAG}/bugpredict-atlassian-lib", MCP
     plan = _plan(bank, facts, default_sel,
-                 ("machine learning", "required", [(models, 2)]),
-                 ("Hugging Face", "required", [(stack, 3), (models, 2)]),
-                 ("evaluation", "required", [(f"{MAG}/bugpredict-eval-protocol", 3), (models, 3)]))
-    pool = [p.key for p in plan.entry("experience/isis-champollion").pool]
-    assert models in pool and stack not in pool
-    assert plan.assigned[0] == models and plan.assigned[1] == models     # Hugging Face moved over
-    kept = next(p for p in plan.entry("experience/isis-champollion").pool if p.key == models)
-    assert set(kept.covers) >= {0, 1} and "Hugging Face" not in kept.terms
+                 ("MCP", "required", [(mcp, 2)]),
+                 ("reusable libraries", "required", [(lib, 3), (mcp, 2)]),
+                 ("Jira and Confluence integration", "required", [(mcp, 3)]))
+    pool = [p.key for p in plan.entry(MAG).pool]
+    assert mcp in pool and lib not in pool
+    assert plan.assigned[1] == mcp                                       # its requirement moved over
+    kept = next(p for p in plan.entry(MAG).pool if p.key == mcp)
+    assert 1 in kept.covers and "reusable libraries" not in kept.terms
 
 
 def test_a_conflict_drops_requirements_the_survivor_cannot_show(bank, facts, default_sel):
-    stack, models = "experience/isis-champollion/easytalk-stack", "experience/isis-champollion/easytalk-models"
+    lib, mcp = f"{MAG}/bugpredict-atlassian-lib", MCP
     plan = _plan(bank, facts, default_sel,
-                 ("fine-tuning", "required", [(models, 3)]),
-                 ("LLM benchmarking", "required", [(models, 3)]),
-                 ("HeidelTime", "required", [(stack, 2)]))               # models isn't linked to it
-    pool = [p.key for p in plan.entry("experience/isis-champollion").pool]
-    assert models in pool and stack not in pool
-    assert 2 not in plan.assigned and plan.uncovered()[0].text == "HeidelTime"
+                 ("MCP servers", "required", [(mcp, 3)]),
+                 ("Jira and Confluence integration", "required", [(mcp, 3)]),
+                 ("packaging a library", "required", [(lib, 2)]))      # mcp isn't linked to it
+    pool = [p.key for p in plan.entry(MAG).pool]
+    assert mcp in pool and lib not in pool
+    assert 2 not in plan.assigned and plan.uncovered()[0].text == "packaging a library"
 
 
 def test_a_project_covers_what_no_experience_shows(bank, facts, default_sel):
@@ -320,7 +321,9 @@ def test_selection_round_trip_renders_and_counts_facts_as_evidence(bank, facts, 
     data = resume_data(bank, sel, "en")
     experience = next(x for x in data["sections"] if x["title"] == "Experience")
     assert experience["entries"][0]["bullets"][0][1] == ["b", "BugPredict"]
-    assert "Education" not in [x["title"] for x in data["sections"]]     # no bullets left: not shown
+    education = next(x for x in data["sections"] if x["title"] == "Education")
+    assert [e["bullets"] for e in education["entries"]] == [[]] * len(education["entries"])   # degrees stay
+    assert len(education["entries"]) == len(default_sel.education)
     assert on_resume(bank, sel, MCP)                     # the second fact counts too
     assert drafts_from(sel, plan, "en")[0].bullets[0].facts == [BP, MCP]
 

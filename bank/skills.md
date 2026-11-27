@@ -11,11 +11,17 @@ Selections pick categories (and optionally a subset of items, in any order).
 label: Languages | Langages
 - Python
 - C++
-- Rust
+- C
+- Java
 - TypeScript/JavaScript
 - SQL
-- AWK
+- CUDA
 - GLSL
+- OCaml
+- Coq
+- Lua
+- Bash
+- AWK
 - PHP
 
 ## ai-ml
@@ -24,8 +30,9 @@ label: AI/ML | IA/ML
 - LangChain
 - Pydantic
 - agentic systems and evaluation | systèmes agentiques et évaluation
-- NLP (CamemBERT, GLiNER, LLM APIs) | TAL (CamemBERT, GLiNER, API de LLM)
 - NLP (CamemBERT, GLiNER, Flair, HeidelTime, Mistral) | TAL (CamemBERT, GLiNER, Flair, HeidelTime, Mistral)
+- Hugging Face Transformers
+- fine-tuning (CamemBERT) | fine-tuning (CamemBERT)
 - MCP (servers and clients) | MCP (serveurs et clients)
 - DSPy
 - Gemini / Vertex AI
@@ -39,6 +46,7 @@ label: AI/ML | IA/ML
 - OCR
 - diffusion models and flow matching (image restoration) | modèles de diffusion et flow matching (restauration d'images)
 - annotation (INCEpTION) | annotation (INCEpTION)
+- fuzzy logic | logique floue
 
 ## tools
 label: Tools | Outils
@@ -50,16 +58,17 @@ label: Tools | Outils
 - Eigen
 - jQuery / DataTables
 - React
+- JavaFX
+- Godot (GDScript)
 - React Flow
 - Zustand
 - Vite
 - PySide6
 - Tkinter
 - Click
-- SvelteKit
-- axum
-- PostgreSQL / pgvector
-- GCP
+- Svelte
+- SQLite
+- Typst
 <!-- Google Cloud and Kubernetes: the basics (deploy containers, use storage, Vertex AI), not expert level -->
 - Google Cloud (Vertex AI, GKE, Cloud Storage)
 - Kubernetes
@@ -88,5 +97,5 @@ label: Testing and QA | Tests et QA
 ## spoken
 label: Languages spoken | Langues
 - Arabic (native) | arabe (langue maternelle)
-- French | français
-- English | anglais
+- French (C1) | français (C1)
+- English (C1) | anglais (C1)

@@ -131,9 +131,13 @@ def entry_data(entries: dict[str, Entry], section: str, pick: EntryPick, lang: s
             raise BankError(f"{section}/{eid}: no bullet '{bid}' (have: {', '.join(entry.bullets)})")
         reworded = None if isinstance(b, str) else getattr(b, lang)   # {id: x, en: "reworded", fr: "..."}
         bullets.append(runs(reworded or entry.bullets[bid].text[lang]))
-    return {"org": plain(per_lang(meta["org"], lang)), "title": plain(per_lang(meta["title"], lang)),
-            "dates": date_range(meta, lang), "location": plain(per_lang(meta.get("location", ""), lang)),
-            "bullets": bullets}
+    out = {"org": plain(per_lang(meta["org"], lang)), "title": plain(per_lang(meta["title"], lang)),
+           "dates": date_range(meta, lang), "location": plain(per_lang(meta.get("location", ""), lang)),
+           "bullets": bullets}
+    link = meta.get("link")                     # {url, text}: shown in place of the location
+    if isinstance(link, dict) and link.get("url"):
+        out["link"] = {"url": str(link["url"]), "text": plain(str(link.get("text") or link["url"]))}
+    return out
 
 
 def skill_groups(groups: dict[str, SkillGroup], picks: list[SkillPick], lang: str) -> list[dict]:

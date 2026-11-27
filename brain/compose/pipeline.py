@@ -73,7 +73,7 @@ def to_selection(default: Selection, plan: Plan, drafts: list[Draft], lang: str)
     def picks(section):
         out = []
         for d in drafts:
-            if d.plan.section == section and (d.bullets or section == "experience"):
+            if d.plan.section == section and (d.bullets or section in ("experience", "education")):
                 out.append(EntryPick(id=d.plan.entry, bullets=[
                     BulletPick(id=b.facts[0].rsplit("/", 1)[-1], facts=b.facts, **{lang: b.text})
                     for b in d.bullets if b.facts]))

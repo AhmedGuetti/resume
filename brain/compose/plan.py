@@ -161,8 +161,9 @@ def make_plan(bank: dict, facts: dict[str, Fact], match: Match, default: Selecti
 
     for eid in [p.id for p in default.education if p.id in bank["education"]]:
         covers = sum(len(p.covers) for k, p in picks.items() if facts[k].where == f"education/{eid}")
-        plan.entries.append(_entry_plan(bank, facts, plan, reach, "education", eid,
-                                        EDUCATION_BULLETS + (1 if covers >= 2 else 0), picks, related))
+        has_facts = any(f.where == f"education/{eid}" for f in facts.values())
+        quota = EDUCATION_BULLETS + (1 if covers >= 2 else 0) if has_facts else 0   # a degree line only
+        plan.entries.append(_entry_plan(bank, facts, plan, reach, "education", eid, quota, picks, related))
 
     def project_value(e):        # what it covers, then what the model linked it to
         return value_of("projects", e) * 10 + sum(v for k, v in related.items() if k.startswith(f"projects/{e}/"))

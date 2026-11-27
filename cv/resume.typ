@@ -38,12 +38,13 @@
 }
 
 // Organisation (semibold) ........ Dates (muted)
-// Role (italic)           ........ Location (muted, smaller)
+// Role (italic)           ........ Location, or the project's link (muted, smaller)
 #let entry(e, extra) = {
   v(4pt + extra)   // more air between entries than inside one
+  let place = if "link" in e { link(e.link.url, e.link.text) } else { e.location }
   block(below: 0.45em, breakable: false)[
     #text(weight: "semibold", e.org) #h(1fr) #text(fill: muted, e.dates) \
-    #emph(e.title) #h(1fr) #text(fill: muted, size: 0.9em, e.location)
+    #emph(e.title) #h(1fr) #text(fill: muted, size: 0.9em, place)
   ]
   if e.bullets.len() > 0 {
     list(..e.bullets.map(rich))

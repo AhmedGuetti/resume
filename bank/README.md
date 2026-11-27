@@ -55,7 +55,11 @@ fr: **BugPredict :** conception d'un pipeline multi-agents de détection de bugs
 - `projects:` (optional, front matter) maps an id prefix to a project:
   `{bugpredict: BugPredict, argus: ARGUS}`. Facts of different projects never share a bullet;
   a fact matching no prefix is the entry's "general" project; no map = one project.
-- `en:` and `fr:` are both required and must each fit on one line.
+- `en:` and `fr:` are both required: usually one line, two at most (see [style.md](style.md)).
+- `link:` (optional, front matter) `{url, text}` shows a link in place of the location, e.g. a
+  project's GitHub repository. Use it only for public repositories.
+- An entry with no `## id` blocks (a degree) is shown as its heading only; in a selection,
+  `bullets: []` does the same for any entry.
 - `tags:` are free-form keywords to help match bullets to a job offer. They never appear on the resume.
 - `conflicts:` (optional) lists groups of bullets that say the same thing. At most one bullet
   of each group goes on a resume: the model's pick and the page filling both
