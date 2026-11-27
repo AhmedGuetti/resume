@@ -70,3 +70,22 @@ def test_default_resume_is_one_page_and_reads_in_order(bank, default_sel, tmp_pa
     positions = [text.find(t) for t in [name, *titles]]
     assert -1 not in positions and positions == sorted(positions)
     assert bank["profile"]["email"] in text
+
+
+def _fill(data):
+    import json
+    import typst
+    from brain.paths import ROOT
+    out = typst.query(str(ROOT / "cv/resume.typ"), "<fill>", field="value", one=True, root=str(ROOT),
+                      sys_inputs={"data": json.dumps(data, ensure_ascii=False)})
+    return json.loads(out)
+
+
+def test_short_resume_grows_its_font_and_stays_one_page(bank, default_sel, tmp_path):
+    """Room left on the page: the body text grows (up to 11.5pt), never past one page."""
+    full = resume_data(bank, default_sel, "fr")
+    short = dict(full, sections=[s for s in full["sections"] if s["kind"] != "skills"][:1])
+    assert _fill(short)["size"] == 11.5 and _fill(short)["fill"] < 0.5
+    assert 10.5 <= _fill(full)["size"] <= 11.5
+    sel = default_sel.model_copy(update={"sections": default_sel.sections[:1]})
+    assert build_all(bank, sel, tmp_path, ["en"]) == {"en": 1}
