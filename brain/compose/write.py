@@ -8,7 +8,9 @@ listed; what still fails is dropped (and said):
   - its facts exist, belong to this entry and to ONE project (at most 3 of them)
   - no fact twice in the entry, and no two facts of a `conflicts:` group
   - every number, and every tool the bank knows of, is in its facts
-  - one line (bank/style.md's limits), no em dash
+  - at most two lines, no em dash
+  - and it reads like a person wrote it (see voice_problems): those problems start with
+    "style:" and, like "too long", send the bullet back once but never drop it
 
 Bullets I accepted before (bank/approved.yaml) are shown to the model, to reuse as written
 when it cites the same facts: a bullet I polished once stays polished.
@@ -28,11 +30,11 @@ from ..render.resume import plain
 from .approved import Approved
 from .facts import Fact, unsupported
 from .match import Requirement
-from .plan import EntryPlan, Plan
+from .plan import PRESENT_VERBS, EntryPlan, Plan
 
 STYLE_FILE = BANK / "style.md"
-MAX_CHARS = {"en": 115, "fr": 125}          # checked: longer is "too long" (two lines)
-ASK_CHARS = {lang: n - 15 for lang, n in MAX_CHARS.items()}   # asked: models overshoot
+MAX_CHARS = {"en": 190, "fr": 210}          # checked: longer is "too long" (past two lines)
+ASK_CHARS = {"en": 140, "fr": 155}          # asked: one line usually, two for an entry's main bullet
 MAX_FACTS = 3
 LANGUAGE = {"en": "English", "fr": "French"}
 
@@ -51,8 +53,10 @@ from the same entry AND the same project. Never combine facts of two projects.
 - Facts marked "must" have to be cited by one of the bullets. Use the other facts to make a \
 bullet stronger or to reach the number of bullets asked; never cite a fact twice.
 - When a fact supports it, use the offer's own words for the same thing (the requirements \
-listed with the fact), so the resume matches what the offer asks.
-- Numbers, tools and names only from the cited facts. One line each: count the characters.
+listed with the fact), so the resume matches what the offer asks. Borrow its nouns and skills, \
+never its verbs: the work is done, so bullets start with a past tense ("Built", "Led", \
+"Measured"), even when the offer says "Build", "Partner with" or "Measure impact".
+- Numbers, tools and names only from the cited facts. Keep each bullet within max_characters_per_bullet: count the characters.
 - Every bullet says what was done. A fact that only lists tools (a "stack") is never a \
 bullet of its own: cite it together with a fact of the same project about the work, and \
 name the tools that matter for the offer inside that bullet.
@@ -171,7 +175,91 @@ def check(bullet: Bullet, ep: EntryPlan, facts: dict[str, Fact], bank: dict, lan
         problems.append(f"too long: {n} characters (max {MAX_CHARS[lang]})")
     if "—" in bullet.text:
         problems.append("em dash")
+    problems += voice_problems(bullet.text, lang)
+    first = opener(bullet.text)
+    if first and any(opener(o.text) == first for o in others if o is not bullet):
+        problems.append(f"style: another bullet of this entry also starts with \"{first}\": vary the verb")
     return problems
+
+
+# ---------- does it read like a person wrote it ----------
+
+# Words and turns that make a bullet read machine-written (bank/style.md lists them too).
+AI_WORDS = {
+    "en": ["leverag", "utiliz", "utilis", "spearhead", "streamlin", "seamless", "robust",
+           "cutting-edge", "ensuring", "despite", "plug-and-play", "various", "a wide range of",
+           "in order to", "responsible for", "helped to", "empower", "showcas", "delve",
+           "synerg", "best-in-class"],
+    "fr": ["tirer parti", "de pointe", "robuste", "permettant de", "afin de garantir", "divers ",
+           "diverses ", "en vue de", "synergie"],
+}
+MAX_SAME_OPENER = 2                          # times one first word may start a bullet on a resume
+# A bullet about past work starts with a past tense ("Built"), never the offer's own present
+# tense ("Build and ship...", "Partner with...", "Measure impact..."). English: PRESENT_VERBS
+# (plan.py) in their base or -s form; French: an infinitive ("Développer") instead of a past
+# participle.
+
+
+def _present_opener(word: str, lang: str) -> bool:
+    w = word.lower()
+    if lang == "fr":
+        return len(w) > 4 and w.endswith(("er", "ir")) and w not in {"premier", "dernier"}
+    return w in PRESENT_VERBS or (w.endswith("s") and w[:-1] in PRESENT_VERBS)
+
+
+def opener(text: str) -> str:
+    """The bullet's first word, as written ("Built", "Conçu")."""
+    words = re.findall(r"[^\W\d_][\w'-]*", plain(text))
+    return words[0] if words else ""
+
+
+def voice_problems(text: str, lang: str) -> list[str]:
+    """What makes a bullet sound written by a model rather than a person. Each one starts
+    with "style:" so it's sent back for a rewrite but never drops the bullet."""
+    out = []
+    flat = plain(text)
+    if re.match(r"\s*[^\s:]+(\s[^\s:]+)?:\s", flat):           # "EasyTalk: ...", "Key courses: ..."
+        out.append("style: starts with a label (\"Name: ...\"): write a sentence")
+    elif re.search(r"\w:\s", flat):
+        out.append("style: a colon introduces a list: say it as a sentence")
+    if ";" in flat:
+        out.append("style: a semicolon tacks on a fragment: use \"and\", a comma, or split it")
+    for group in re.findall(r"\(([^)]*)\)", flat):
+        if group.count(",") >= 2:
+            out.append("style: a list of tools in brackets: name the one or two that matter")
+            break
+    first = opener(text)
+    if first and _present_opener(first, lang):
+        # "tense:", not "style:": wrong for past work, so after its retry the bullet falls
+        # back to its fact's own words rather than staying on the page as written
+        out.append(f"tense: starts with \"{first}\", a present tense: say what was done "
+                   "(\"Built\", not \"Build\")" if lang == "en" else
+                   f"tense: commence par l'infinitif \"{first}\" : utiliser le participe passé "
+                   "(\"Développé\", pas \"Développer\")")
+    # Lowercase only: "Plug-and-Play methods" (a paper's method) is a name, "plug-and-play" filler.
+    sentence = flat[:1].lower() + flat[1:]
+    found = [w.strip() for w in AI_WORDS.get(lang, []) if w in sentence]
+    if found:
+        out.append(f"style: sounds machine-written ({', '.join(found)}): say it plainly")
+    return out
+
+
+def repeated_openers(drafts: list["Draft"]) -> None:
+    """Across the whole resume, a first word used more than MAX_SAME_OPENER times: the extra
+    bullets (later entries first) get a style problem."""
+    seen: dict[str, int] = {}
+    for d in drafts:
+        for b in d.bullets:
+            word = opener(b.text)
+            seen[word] = seen.get(word, 0) + 1
+            if word and seen[word] > MAX_SAME_OPENER:
+                b.problems.append(f"style: \"{word}\" already starts {MAX_SAME_OPENER} bullets "
+                                  "on this resume: use another verb")
+
+
+def serious(problems: list[str]) -> list[str]:
+    """The problems that drop a bullet: not length or style, which only ask for a rewrite."""
+    return [p for p in problems if not p.startswith(("too long", "style:"))]
 
 
 def finish(bullet: Bullet, ep: EntryPlan) -> Bullet:
@@ -186,7 +274,7 @@ def compose(bank: dict, facts: dict[str, Fact], plan: Plan, lang: str, llm: LLM,
             title: str | None) -> tuple[list[Draft], list[str]]:
     """Every entry's bullets, checked. Returns (drafts in plan order, notes)."""
     requests = [entry_request(bank, facts, ep, plan.requirements, lang, approved, ep.quota)
-                for ep in plan.entries]
+                for ep in plan.entries if ep.quota > 0]          # 0: a degree shown without bullets
     answer = ask_model(llm, lang, title, requests)
     drafts = [Draft(ep, answer.get(ep.where, [])) for ep in plan.entries]
     notes = repair(bank, facts, plan.requirements, drafts, lang, llm, approved, title)
@@ -199,6 +287,7 @@ def repair(bank, facts, reqs, drafts: list[Draft], lang, llm, approved, title) -
     for d in drafts:
         for b in d.bullets:
             b.problems = check(b, d.plan, facts, bank, lang, d.bullets)
+    repeated_openers(drafts)
     failing = [d for d in drafts if any(b.problems for b in d.bullets) or len(d.bullets) < d.plan.quota]
     if failing:
         requests = []
@@ -207,7 +296,8 @@ def repair(bank, facts, reqs, drafts: list[Draft], lang, llm, approved, title) -
             req["previous_attempt"] = [{"text": b.text, "facts": b.facts, "problems": b.problems}
                                        for b in d.bullets]
             req["instruction"] = ("Rewrite this entry's bullets: keep the good ones as they are, "
-                                  "fix every problem listed, and write exactly the number of bullets asked.")
+                                  "fix every problem listed (a \"style:\" problem means it doesn't read "
+                                  "like a person wrote it), and write exactly the number of bullets asked.")
             requests.append(req)
         answer = ask_model(llm, lang, title, requests)
         for d in failing:
@@ -216,16 +306,37 @@ def repair(bank, facts, reqs, drafts: list[Draft], lang, llm, approved, title) -
                 d.bullets = again
                 for b in d.bullets:
                     b.problems = check(b, d.plan, facts, bank, lang, d.bullets)
+    repeated_openers(drafts)
     for d in drafts:
         kept = []
         for b in d.bullets:
-            serious = [p for p in b.problems if not p.startswith("too long")]
-            if serious:
-                notes.append(f"{d.where}: dropped \"{b.text[:60]}...\" ({'; '.join(serious)})")
+            bad = serious(b.problems)
+            if bad and _fall_back(b, d, facts, bank, lang, kept):
+                notes.append(f"{d.where}: used the fact's own words instead of \"{b.text[:50]}...\" "
+                             f"({'; '.join(bad)})")
+                bad = []
+            if bad:
+                notes.append(f"{d.where}: dropped \"{b.text[:60]}...\" ({'; '.join(bad)})")
             else:
                 kept.append(finish(b, d.plan))
         d.bullets = kept
     return notes
+
+
+def _fall_back(b: Bullet, d: Draft, facts, bank, lang, kept: list[Bullet]) -> bool:
+    """A bullet that still fails after its retry: rewrite it as the bank text of the first
+    fact it cites, if that fact belongs here and isn't used yet. The bank's facts are written
+    in my style, so the work stays on the page instead of being dropped."""
+    used = {k for o in kept for k in o.facts}
+    for k in b.facts:
+        f = facts.get(k)
+        if f is None or f.where != d.where or k in used:
+            continue
+        b.text, b.facts = f.text[lang], [k]
+        b.problems = check(b, d.plan, facts, bank, lang, kept + [b])
+        # the fact's own words can't be asked to name the offer's terms: the fact is the proof
+        return not [p for p in serious(b.problems) if not p.startswith("doesn't name")]
+    return False
 
 
 def redo(bank, facts, reqs, d: Draft, lang, llm, approved, title, which: int | None,

@@ -22,7 +22,7 @@ from .facts import Fact, load_facts
 from .match import Match, Requirement, match
 from .plan import MAX_BULLETS, MIN_BULLETS, EntryPlan, Pick, Plan, make_plan
 from .review import Tools, default_ask, review
-from .write import Bullet, Draft, add_one, check, compose, finish, redo
+from .write import Bullet, Draft, add_one, check, compose, finish, redo, serious
 
 FALLBACK_AFTER_UNKNOWN = 3      # this many made-up fact keys -> try the fallback model
 # Filling the page: below FULL_ENOUGH of the page, the model writes up to MAX_TOP_UP more
@@ -73,7 +73,7 @@ def to_selection(default: Selection, plan: Plan, drafts: list[Draft], lang: str)
     def picks(section):
         out = []
         for d in drafts:
-            if d.plan.section == section and (d.bullets or section == "experience"):
+            if d.plan.section == section and (d.bullets or section in ("experience", "education")):
                 out.append(EntryPick(id=d.plan.entry, bullets=[
                     BulletPick(id=b.facts[0].rsplit("/", 1)[-1], facts=b.facts, **{lang: b.text})
                     for b in d.bullets if b.facts]))
@@ -87,11 +87,15 @@ def to_selection(default: Selection, plan: Plan, drafts: list[Draft], lang: str)
 
 def drop_order(drafts: list[Draft]) -> list[tuple[Draft, int]]:
     """Bullets that may go, first to go first: projects, then education beyond its first
-    bullet, then experience beyond MIN_BULLETS; the least valuable first in each."""
+    bullet, then experience beyond MIN_BULLETS; the least valuable first in each. The best
+    project (the plan's first, the one closest to the offer) keeps one bullet, so the page
+    never loses its Projects section to fitting."""
     rank = {"projects": 0, "education": 1, "experience": 2}
+    best_project = next((d for d in drafts if d.plan.section == "projects" and d.bullets), None)
     cands = []
     for d in drafts:
-        keep = {"experience": MIN_BULLETS, "education": 1, "projects": 0}[d.plan.section]
+        keep = {"experience": MIN_BULLETS, "education": 1,
+                "projects": 1 if d is best_project else 0}[d.plan.section]
         best_first = sorted(range(len(d.bullets)), key=lambda i: -d.bullets[i].value)
         for i in best_first[keep:]:
             cands.append((rank[d.plan.section], d.bullets[i].value, -i, d, i))
@@ -154,7 +158,7 @@ def top_up(bank: dict, default: Selection, plan: Plan, drafts: list[Draft], lang
             d.bullets[:] = before
             return added, str(e)
         new = [b for b in d.bullets if not any(b is x for x in before)]
-        if not new or problems:
+        if not new or serious(problems):
             d.bullets[:] = before
             tried.add(d.where)
             continue

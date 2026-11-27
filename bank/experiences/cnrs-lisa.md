@@ -44,22 +44,22 @@ Conflicts: see `conflicts:` in the front matter (checked by the code).
 ## lisa-overview
 tags: nlp, machine-translation, research, teamwork, interdisciplinary
 en: Research internship on a statistical Corsican ↔ French machine translation system, working with a linguistics intern under a software engineer and a Corsican-linguistics researcher.
-fr: Stage de recherche sur un système de traduction automatique statistique corse ↔ français, en binôme avec un stagiaire en linguistique, encadré par un ingénieur logiciel et un chercheur en linguistique corse.
+fr: Stagiaire de recherche sur un système de traduction statistique corse ↔ français, en binôme avec un stagiaire en linguistique, encadré par un ingénieur et un chercheur.
 
 ## lisa-pitch
 tags: nlp, machine-translation, statistical-mt, low-resource, corsican
-en: **Corsican ↔ French MT:** worked on a statistical translation system for Corsican, a low-resource language, trained on Corsican and Italian books translated into French and annotated.
-fr: **TA corse ↔ français :** travail sur un système de traduction statistique pour le corse, langue peu dotée, entraîné sur des livres corses et italiens traduits en français et annotés.
+en: Worked on a statistical translation system from Corsican, a low-resource language, to French, trained on annotated Corsican and Italian books.
+fr: Travaillé sur un système de traduction statistique du corse, langue peu dotée, vers le français, entraîné sur des livres corses et italiens annotés.
 
 ## lisa-error-analysis
 tags: error-analysis, debugging, data-quality, nlp, pos-tagging
 en: Tracked down where the model failed on specific sentences and traced the failures to data problems, such as adjectives tagged as verbs.
-fr: Identification des phrases où le modèle échouait et des causes, liées aux données (par exemple des adjectifs étiquetés comme verbes).
+fr: Repéré les phrases où le modèle échouait et remonté leurs causes jusqu'aux données, par exemple des adjectifs étiquetés comme verbes.
 
 ## lisa-tooling
 tags: python, awk, flair, data-visualization, excel, interdisciplinary, tooling, scripting
-en: Built an analysis pipeline for Flair's output: Python to parse it, AWK scripts to compute statistics, and Excel sheets and graphs comparing each Corsican word with its expected grammatical category in context, so the linguistics side could spot anomalies.
-fr: Pipeline d'analyse des sorties de Flair : Python pour les parser, scripts AWK pour les statistiques, puis tableaux et graphiques Excel comparant chaque mot corse à sa catégorie grammaticale attendue dans la phrase, pour permettre aux linguistes de repérer les anomalies.
+en: Built a Python and AWK pipeline that turned Flair's output into Excel graphs per Corsican word, so the linguists could spot tagging anomalies.
+fr: Développé un pipeline Python et AWK qui transforme les sorties de Flair en graphiques Excel par mot corse, pour que les linguistes repèrent les anomalies d'étiquetage.
 
 ## lisa-tooling-short
 tags: python, awk, flair, interdisciplinary, tooling
@@ -67,9 +67,9 @@ en: Built a Python → AWK → Excel pipeline that made model errors readable fo
 fr: Pipeline Python → AWK → Excel rendant les erreurs du modèle lisibles pour les linguistes.
 
 ## lisa-results
-tags: evaluation, metrics, impact, data-quality
-en: The data fixes raised the model's precision from about 0.90 to 0.96; the remaining errors were cases still debated among Corsican linguists.
-fr: Les corrections de données ont fait passer la précision du modèle d'environ 0,90 à 0,96 ; les erreurs restantes portaient sur des cas encore débattus par les linguistes corses.
+tags: highlight, evaluation, metrics, impact, data-quality
+en: Raised the model's precision from about 0.90 to 0.96 by fixing the data, leaving only cases still debated among Corsican linguists.
+fr: Fait passer la précision du modèle d'environ 0,90 à 0,96 en corrigeant les données, les erreurs restantes portant sur des cas encore débattus par les linguistes corses.
 
 ## lisa-results-short
 tags: evaluation, metrics, impact
@@ -78,8 +78,8 @@ fr: Précision du modèle portée d'environ 0,90 à 0,96 grâce à la correction
 
 ## lisa-ocr
 tags: ocr, corpus-building, data-collection, low-resource, data-cleaning
-en: Extended the corpus by digitising a Corsican book with the other intern: scanning, OCR and manual correction, in two days.
-fr: Enrichissement du corpus par la numérisation d'un livre corse avec l'autre stagiaire : scan, OCR et correction manuelle, en deux jours.
+en: Digitised a Corsican book with the other intern in two days, from scanning and OCR to manual correction, to grow the corpus.
+fr: Numérisé un livre corse avec l'autre stagiaire en deux jours, du scan et de l'OCR à la correction manuelle, pour enrichir le corpus.
 
 ## lisa-awk
 tags: awk, scripting, cli, linux, data-processing, tooling
@@ -89,7 +89,7 @@ fr: Écriture de scripts AWK qui lisaient les résultats de l'étiqueteur dans l
 ## lisa-context
 tags: nlp, pos-tagging, low-resource, corsican, research, annotation
 en: Contributed to the lab's effort to build the first part-of-speech tagger for Corsican, a low-resource language with no standard spelling.
-fr: Contribution au travail du laboratoire pour construire le premier étiqueteur morphosyntaxique du corse, langue peu dotée sans orthographe standardisée.
+fr: Contribué au premier étiqueteur morphosyntaxique du corse, une langue peu dotée sans orthographe standardisée.
 
 ## lisa-stack
 tags: flair, pytorch, python, awk, excel, ocr

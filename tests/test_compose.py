@@ -8,9 +8,9 @@ from brain.compose.approved import Approved
 from brain.compose.facts import GENERAL, load_facts, unsupported
 from brain.compose.match import Match, Requirement, read_answer, split_list
 from brain.compose.pipeline import MAX_TOP_UP, drafts_from, drop_order, fit_page, to_selection, top_up
-from brain.compose.plan import MIN_BULLETS, make_plan
+from brain.compose.plan import MIN_BULLETS, is_term, make_plan
 from brain.compose.review import Tools, review
-from brain.compose.write import Bullet, Draft, check, compose
+from brain.compose.write import Bullet, Draft, check, compose, repeated_openers, serious, voice_problems
 from brain.render.resume import resume_data
 from brain.score.requirements import on_resume
 
@@ -70,6 +70,16 @@ def _plan(bank, facts, default_sel, *reqs):
                      default_sel)
 
 
+@pytest.mark.parametrize("text, term", [
+    ("PyTorch", True), ("SQL and databases", True), ("Hugging Face", True),
+    ("Build and ship", False), ("Partner with teams", False), ("Measure impact", False),
+    ("Make it stick", False), ("Redesign processes", False),
+    ("Strong knowledge of Python", False),                     # too long to name word for word
+])
+def test_only_skills_must_be_named_not_the_offers_verbs(text, term):
+    assert is_term(text) is term
+
+
 def test_experience_beats_a_project_statically(bank, facts, default_sel):
     plan = _plan(bank, facts, default_sel, ("AI coding tools", "required", [(NINURTA, 3), (ATAS, 2)]))
     assert plan.assigned[0] == ATAS
@@ -78,29 +88,43 @@ def test_experience_beats_a_project_statically(bank, facts, default_sel):
 
 
 def test_a_conflict_keeps_the_fact_that_answers_more_of_the_offer(bank, facts, default_sel):
-    """The HP case: easytalk-stack won "Hugging Face" alone and pushed out easytalk-models,
-    the fine-tuning fact linked to three requirements. Now models stays and takes over."""
-    stack, models = "experience/isis-champollion/easytalk-stack", "experience/isis-champollion/easytalk-models"
+    """The HP case: one fact won a single requirement and pushed out a conflicting fact linked
+    to three. Now the broader one stays and takes over. (Magellan: bugpredict-mcp and
+    bugpredict-atlassian-lib may not sit together.)"""
+    lib, mcp = f"{MAG}/bugpredict-atlassian-lib", MCP
     plan = _plan(bank, facts, default_sel,
-                 ("machine learning", "required", [(models, 2)]),
-                 ("Hugging Face", "required", [(stack, 3), (models, 2)]),
-                 ("evaluation", "required", [(f"{MAG}/bugpredict-eval-protocol", 3), (models, 3)]))
-    pool = [p.key for p in plan.entry("experience/isis-champollion").pool]
-    assert models in pool and stack not in pool
-    assert plan.assigned[0] == models and plan.assigned[1] == models     # Hugging Face moved over
-    kept = next(p for p in plan.entry("experience/isis-champollion").pool if p.key == models)
-    assert set(kept.covers) >= {0, 1} and "Hugging Face" not in kept.terms
+                 ("MCP", "required", [(mcp, 2)]),
+                 ("reusable libraries", "required", [(lib, 3), (mcp, 2)]),
+                 ("Jira and Confluence integration", "required", [(mcp, 3)]))
+    pool = [p.key for p in plan.entry(MAG).pool]
+    assert mcp in pool and lib not in pool
+    assert plan.assigned[1] == mcp                                       # its requirement moved over
+    kept = next(p for p in plan.entry(MAG).pool if p.key == mcp)
+    assert 1 in kept.covers and "reusable libraries" not in kept.terms
+
+
+def test_highlights_are_always_in_their_experience(bank, facts, default_sel):
+    """Strong results (`highlight` tag) rarely match a requirement word for word: they are
+    added to their entry's pool anyway, as must-use facts, at most two per entry."""
+    plan = _plan(bank, facts, default_sel, ("Kotlin", "required", [(BP, 2)]))
+    mag = plan.entry(MAG)
+    picked = {p.key: p for p in mag.pool}
+    for key in (f"{MAG}/bugpredict-time", f"{MAG}/bugpredict-vs-testers"):
+        assert key in picked and picked[key].must and picked[key].value > 0
+    lisa = plan.entry("experience/cnrs-lisa")
+    assert any(p.key.endswith("lisa-results") and p.must for p in lisa.pool)
+    assert sum(1 for p in mag.pool if "highlight" in facts[p.key].tags) <= 2
 
 
 def test_a_conflict_drops_requirements_the_survivor_cannot_show(bank, facts, default_sel):
-    stack, models = "experience/isis-champollion/easytalk-stack", "experience/isis-champollion/easytalk-models"
+    lib, mcp = f"{MAG}/bugpredict-atlassian-lib", MCP
     plan = _plan(bank, facts, default_sel,
-                 ("fine-tuning", "required", [(models, 3)]),
-                 ("LLM benchmarking", "required", [(models, 3)]),
-                 ("HeidelTime", "required", [(stack, 2)]))               # models isn't linked to it
-    pool = [p.key for p in plan.entry("experience/isis-champollion").pool]
-    assert models in pool and stack not in pool
-    assert 2 not in plan.assigned and plan.uncovered()[0].text == "HeidelTime"
+                 ("MCP servers", "required", [(mcp, 3)]),
+                 ("Jira and Confluence integration", "required", [(mcp, 3)]),
+                 ("packaging a library", "required", [(lib, 2)]))      # mcp isn't linked to it
+    pool = [p.key for p in plan.entry(MAG).pool]
+    assert mcp in pool and lib not in pool
+    assert 2 not in plan.assigned and plan.uncovered()[0].text == "packaging a library"
 
 
 def test_a_project_covers_what_no_experience_shows(bank, facts, default_sel):
@@ -143,7 +167,7 @@ def mag_draft(bank, facts, default_sel):
 
 def test_check_catches_what_isnt_true(bank, facts, mag_draft):
     _, ep = mag_draft
-    good = Bullet("Built **BugPredict**, a multi-agent LangGraph system; used by 3 teams.", [BP])
+    good = Bullet("Built **BugPredict**, a multi-agent LangGraph system now used by 3 teams.", [BP])
     assert check(good, ep, facts, bank, "en", [good]) == []
     mixed = Bullet("Built BugPredict and the aTaS agent.", [BP, ATAS])
     assert any("mixes projects" in p for p in check(mixed, ep, facts, bank, "en", [mixed]))
@@ -152,9 +176,9 @@ def test_check_catches_what_isnt_true(bank, facts, mag_draft):
     assert any("12" in p for p in problems) and any("PyTorch" in p for p in problems)
     other = Bullet("Built a tagger.", [LISA])
     assert any("not in this entry" in p for p in check(other, ep, facts, bank, "en", [other]))
-    long = Bullet("Built BugPredict " + "with LangGraph " * 10, [BP])
+    long = Bullet("Built BugPredict " + "with LangGraph " * 14, [BP])
     assert any(p.startswith("too long") for p in check(long, ep, facts, bank, "en", [long]))
-    vague = Bullet("Built **BugPredict**, a multi-agent system; used by 3 teams.", [BP])
+    vague = Bullet("Built **BugPredict**, a multi-agent system used by 3 teams.", [BP])
     assert any("doesn't name LangGraph" in p for p in check(vague, ep, facts, bank, "en", [vague]))
     twice = [Bullet("Built BugPredict.", [BP]), Bullet("Built BugPredict again.", [BP])]
     assert any("already used" in p for p in check(twice[1], ep, facts, bank, "en", twice))
@@ -179,14 +203,76 @@ def test_compose_sends_failures_back_once_then_drops_them(bank, facts, default_s
         {"text": "Built BugPredict on Kubernetes for 40 teams.", "facts": [MCP]}]}]}
     still_bad = {"entries": [{"entry": MAG, "bullets": [
         {"text": "Built **BugPredict**, a multi-agent LangGraph system; used by 3 teams.", "facts": [BP]},
-        {"text": "Connected the agents to Jira and Confluence for 40 teams.", "facts": [MCP]}]}]}
+        {"text": "Connected the agents to Jira and Confluence for 40 teams.", "facts": [LISA]}]}]}
     llm = Scripted(bad, still_bad)
     drafts, notes = compose(bank, facts, plan, "en", llm, Approved(tmp_path / "a.yaml"), "AI Engineer")
     assert [b.facts for b in drafts[0].bullets] == [[BP]]
     assert drafts[0].bullets[0].covers == [0] and drafts[0].bullets[0].value > 0
     assert notes and "40" in notes[0]
     assert "previous_attempt" in llm.calls[1]["user"] and "bank/style.md" not in llm.calls[0]["system"]
-    assert "Built and deployed **BugPredict**" in llm.calls[0]["system"]         # the style examples
+    assert "Turned the Jira and Confluence connector" in llm.calls[0]["system"]   # the style examples
+    kept = drafts[0].bullets[0]                                     # a semicolon: style, not dropped
+    assert any(p.startswith("style:") for p in kept.problems) and not serious(kept.problems)
+
+
+@pytest.mark.parametrize("text, lang, smell", [
+    ("**ARGUS:** built a no-code agent engine.", "en", "label"),
+    ("Built ARGUS solo: a plug-and-play agent engine so testers create agents.", "en", "colon"),
+    ("Built **BugPredict**, a LangGraph system; used by 3 teams.", "en", "semicolon"),
+    ("Refactored BugPredict into plugins (ToolRegistry, Pydantic, LangGraph edges).", "en", "brackets"),
+    ("Added Pydantic validation to enforce strict schemas despite model randomness.", "en", "despite"),
+    ("Leveraged LangGraph to build a robust pipeline.", "en", "leverag, robust"),
+    ("Conçu un pipeline robuste permettant de traiter les comptes rendus.", "fr", "robuste, permettant de"),
+    ("Build and ship as main developer in a team of 3.", "en", "present tense"),
+    ("Partner with teams of doctors and researchers.", "en", "present tense"),
+    ("Tracks each application from offer to answer.", "en", "present tense"),
+    ("Développer un pipeline d'extraction pour les comptes rendus.", "fr", "infinitif"),
+])
+def test_voice_problems_catch_machine_written_turns(text, lang, smell):
+    found = " ".join(voice_problems(text, lang))
+    assert found.startswith(("style:", "tense:")) and all(s in found for s in smell.split(", "))
+    if "present tense" in smell or "infinitif" in smell:
+        assert serious(voice_problems(text, lang))          # wrong tense: not kept as written
+
+
+@pytest.mark.parametrize("text, lang", [
+    ("Wrote **ARGUS** on my own, an agent engine that lets testers set up their own agents without writing code.", "en"),
+    ("On BigVul, every bug BugPredict flagged was real (precision 1.0), though it caught about a quarter of them.", "en"),
+    ("Raised the model's precision from about 0.90 to 0.96 by fixing the data, not the model.", "en"),
+    ("Reproduced PnP-Flow (ICLR 2025), combining Plug-and-Play methods with Flow Matching.", "en"),
+    ("Développé seul **ARGUS**, un moteur d'agents qui permet aux testeurs de créer leurs agents sans coder.", "fr"),
+])
+def test_voice_problems_leave_plain_sentences_alone(text, lang):
+    assert voice_problems(text, lang) == []
+
+
+def test_repeated_openers_on_the_resume_and_in_an_entry(bank, facts, default_sel):
+    plan = _plan(bank, facts, default_sel, ("LangGraph", "required", [(BP, 3)]))
+    drafts = [Draft(ep, [Bullet(f"Built thing {i}.", [p.key]) for i, p in zip(range(2), ep.pool)])
+              for ep in plan.entries if ep.section == "experience"]
+    for d in drafts:
+        for b in d.bullets:
+            b.problems = []
+    repeated_openers(drafts)
+    flagged = [b for d in drafts for b in d.bullets if b.problems]
+    assert len(flagged) == sum(len(d.bullets) for d in drafts) - 2     # all but the first two "Built"
+    assert all('"Built" already starts' in b.problems[0] for b in flagged)
+    _, ep = next((d, d.plan) for d in drafts if d.where == MAG)
+    two = [Bullet("Built **BugPredict**, a LangGraph system.", [BP]), Bullet("Built an MCP server.", [MCP])]
+    assert any("also starts with" in p for p in check(two[1], ep, facts, bank, "en", two))
+
+
+def test_a_bullet_that_still_fails_falls_back_to_its_facts_words(bank, facts, default_sel, tmp_path):
+    plan = _plan(bank, facts, default_sel, ("LangGraph", "required", [(BP, 3)]))
+    plan.entries = [plan.entry(MAG)]
+    plan.entries[0].quota = 2
+    twice = {"entries": [{"entry": MAG, "bullets": [
+        {"text": "Built **BugPredict**, a LangGraph multi-agent system now used by 3 teams.", "facts": [BP]},
+        {"text": "Connected the agents to Jira and Confluence for 40 teams.", "facts": [MCP]}]}]}
+    drafts, notes = compose(bank, facts, plan, "en", Scripted(twice, twice), Approved(tmp_path / "a.yaml"), None)
+    assert [b.facts for b in drafts[0].bullets] == [[BP], [MCP]]
+    assert drafts[0].bullets[1].text == facts[MCP].text["en"]               # the bank's own words
+    assert any("fact's own words" in n for n in notes)
 
 
 def test_approved_bullets_are_offered_back(bank, facts, default_sel, tmp_path):
@@ -206,13 +292,17 @@ def test_drop_order_projects_then_education_then_extra_experience(bank, facts, d
     plan = _plan(bank, facts, default_sel, ("AI coding tools", "required", [(NINURTA, 3)]))
     drafts = []
     for ep in plan.entries:
-        n = {"experience": 3, "education": 2, "projects": 1}[ep.section]
+        n = {"experience": 3, "education": 2, "projects": 2}[ep.section]
         drafts.append(Draft(ep, [Bullet(f"{ep.entry} {i}", [p.key], value=float(i))
                                  for i, p in zip(range(n), ep.pool)]))
     order = [(d.plan.section, i) for d, i in drop_order(drafts)]
     sections = [s for s, _ in order]
     assert sections[0] == "projects" and sections.index("education") < sections.index("experience")
     assert sum(1 for s in sections if s == "experience") == 3 * (3 - MIN_BULLETS)
+    projects = [d for d in drafts if d.plan.section == "projects" and d.bullets]
+    dropped = sum(1 for s in sections if s == "projects")
+    assert dropped == sum(len(d.bullets) for d in projects) - 1        # the best project keeps one
+    assert all(d is not projects[0] or i != 1 for d, i in drop_order(drafts))
 
 
 def _drafts(plan, n):
@@ -277,7 +367,9 @@ def test_selection_round_trip_renders_and_counts_facts_as_evidence(bank, facts, 
     data = resume_data(bank, sel, "en")
     experience = next(x for x in data["sections"] if x["title"] == "Experience")
     assert experience["entries"][0]["bullets"][0][1] == ["b", "BugPredict"]
-    assert "Education" not in [x["title"] for x in data["sections"]]     # no bullets left: not shown
+    education = next(x for x in data["sections"] if x["title"] == "Education")
+    assert [e["bullets"] for e in education["entries"]] == [[]] * len(education["entries"])   # degrees stay
+    assert len(education["entries"]) == len(default_sel.education)
     assert on_resume(bank, sel, MCP)                     # the second fact counts too
     assert drafts_from(sel, plan, "en")[0].bullets[0].facts == [BP, MCP]
 

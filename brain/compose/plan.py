@@ -36,6 +36,31 @@ POOL = 3                         # facts offered to the composer per bullet
 RANK_BONUS = 1.0                 # per rank step, inside a section
 LOAD_PENALTY = 3.0               # per requirement already carried, scaled by the entry's base share
 FORCED = 1000.0                  # value of a must-use fact (the gap interview's answers)
+# Facts tagged `highlight` in the bank (my strongest results: time saved, precision gained)
+# go on every resume that shows their experience, at most MAX_HIGHLIGHTS per entry: they
+# rarely answer a requirement word for word, so the matching alone would leave them out.
+HIGHLIGHT_VALUE = 4.0
+MAX_HIGHLIGHTS = 2
+
+
+PRESENT_VERBS = {
+    "build", "ship", "connect", "partner", "measure", "design", "develop", "create", "lead",
+    "own", "drive", "deliver", "implement", "write", "manage", "support", "collaborate", "work",
+    "use", "make", "improve", "optimize", "optimise", "automate", "deploy", "integrate",
+    "maintain", "help", "ensure", "define", "translate", "test", "monitor", "analyze",
+    "analyse", "document", "redesign", "scale", "launch", "enable", "train", "fine-tune",
+    "evaluate", "benchmark", "turn", "wrap", "add", "validate", "prepare", "contribute",
+    "reduce", "increase", "find", "bring", "apply", "reproduce", "join", "present", "engineer",
+    "architect", "craft", "partner", "assemble", "generate", "track", "trace", "lower", "raise",
+}
+
+
+def is_term(text: str) -> bool:
+    """A requirement short enough to be named word for word in a bullet (\"PyTorch\",
+    \"SQL and databases\"), not a verb phrase (\"Build and ship\", \"Measure impact\"), which
+    would push the offer's present tense into a bullet about past work."""
+    words = text.split()
+    return 0 < len(words) <= 3 and words[0].lower().strip("-") not in PRESENT_VERBS
 
 
 @dataclass
@@ -128,7 +153,7 @@ def make_plan(bank: dict, facts: dict[str, Fact], match: Match, default: Selecti
         pick.value += req.weight * strength
         pick.covers.append(req.index)
         pick.must = True
-        if len(req.text.split()) <= 3:
+        if is_term(req.text):
             pick.terms.append(req.text)
         load[(fact.section, fact.entry)] = load.get((fact.section, fact.entry), 0) + 1
         plan.assigned[req.index] = fact.key
@@ -161,8 +186,9 @@ def make_plan(bank: dict, facts: dict[str, Fact], match: Match, default: Selecti
 
     for eid in [p.id for p in default.education if p.id in bank["education"]]:
         covers = sum(len(p.covers) for k, p in picks.items() if facts[k].where == f"education/{eid}")
-        plan.entries.append(_entry_plan(bank, facts, plan, reach, "education", eid,
-                                        EDUCATION_BULLETS + (1 if covers >= 2 else 0), picks, related))
+        has_facts = any(f.where == f"education/{eid}" for f in facts.values())
+        quota = EDUCATION_BULLETS + (1 if covers >= 2 else 0) if has_facts else 0   # a degree line only
+        plan.entries.append(_entry_plan(bank, facts, plan, reach, "education", eid, quota, picks, related))
 
     def project_value(e):        # what it covers, then what the model linked it to
         return value_of("projects", e) * 10 + sum(v for k, v in related.items() if k.startswith(f"projects/{e}/"))
@@ -220,6 +246,15 @@ def _entry_plan(bank, facts, plan, reach, section, eid, quota, picks, related) -
         _take_over(win, lose, plan, reach, weight)
         if win is p:
             pool[at], ids[at] = p, fid
+    if section == "experience":
+        marked = [f for f in mine if "highlight" in f.tags and f.key not in {p.key for p in pool}]
+        for f in marked[:MAX_HIGHLIGHTS]:
+            if entry.clash(f.id, ids):
+                continue
+            pick = picks.get(f.key) or Pick(f.key)
+            pick.value, pick.must = max(pick.value, HIGHLIGHT_VALUE), True
+            pool.append(pick)
+            ids.append(f.id)
     for f in others:
         if len(pool) >= max(quota * POOL, len(assigned)):
             break

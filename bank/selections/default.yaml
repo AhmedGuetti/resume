@@ -3,45 +3,56 @@
 #
 # Every entry refers to a bank file by its name without .md, and to bullets by
 # their `## id`. Leave out `bullets` (or `items` for skills) to take all of them
-# in file order. Order in this file = order on the page.
+# in file order. Order in this file = order on the page. `bullets: []` shows the
+# entry's heading only (a degree line).
 
 sections: [education, experience, projects, skills]
 
 education:
   - id: ut3-master-iafa
-    bullets: [tir-paper, coursework, course-projects]
+    bullets: [tir-paper]
+  - id: corse-licence
+    bullets: []
+  - id: oujda-licence
+    bullets: []
 
 experience:
   - id: magellan
     bullets:
-      - overview
-      - bugpredict-refactor-short
-      - bugpredict-benchmark
-      - bugpredict-cicd-short
-      - argus-pitch-short
-      - argus-spec-vs-code
-      - handover
+      - bugpredict-pitch
+      - bugpredict-time
+      - bugpredict-vs-testers
+      - bugpredict-mcp
+      - argus-pitch
   - id: isis-champollion
-    bullets: [easytalk-pitch, easytalk-heideltime, easyrmm-results-short]
+    bullets: [easytalk-pitch, easytalk-models, easyrmm-results-short]
   - id: cnrs-lisa
-    bullets: [lisa-pitch, lisa-tooling-short, lisa-results-short]
+    bullets: [lisa-pitch, lisa-results]
 
 projects:
-  - id: gmath
   - id: ninurta
-    bullets: [resume-tailoring, application-stats]
+    bullets: [resume-tailoring, claude-code]
+  - id: gmath
+    bullets: [ml-from-scratch]
 
 skills:
   - id: languages
-    items: [Python, C++, Rust, TypeScript/JavaScript, SQL]
+    items: [Python, C++, Java, TypeScript/JavaScript, SQL]
   - id: ai-ml
     items:
       - LangGraph
-      - LangChain
-      - Pydantic
+      - PyTorch
+      - Hugging Face Transformers
       - agentic systems and evaluation
-      - NLP (CamemBERT, GLiNER, LLM APIs)
+      - NLP (CamemBERT, GLiNER, Flair, HeidelTime, Mistral)
       - computer vision
   - id: tools
-    items: [OpenGL, FastAPI, React, PySide6, GCP, GitLab CI/CD, Git, WSL2/Linux, Neovim]
+    items:
+      - FastAPI
+      - Docker
+      - Google Cloud (Vertex AI, GKE, Cloud Storage)
+      - GitLab CI/CD
+      - Git
+      - React
+      - OpenGL
   - id: spoken

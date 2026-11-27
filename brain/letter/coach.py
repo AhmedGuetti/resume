@@ -63,9 +63,10 @@ def proof_material(bank: dict, record: JobRecord | None, lang: str, limit: int =
 
 
 def top_project(proof: list[tuple[str, str, str]]) -> str | None:
-    """The name in bold at the start of your strongest proof bullet ("**BugPredict:** ...")."""
+    """The first name in bold in your strongest proof bullet ("Built **BugPredict**, ...",
+    or the older "**BugPredict:** ...")."""
     for _, _, text in proof:
-        m = re.match(r"\*\*(.+?)\s*:?\s*\*\*", text)
+        m = re.search(r"\*\*(.+?)\s*:?\s*\*\*", text)
         if m:
             return m.group(1).strip(" :")
     return None
