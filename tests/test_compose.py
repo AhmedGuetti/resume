@@ -10,7 +10,7 @@ from brain.compose.match import Match, Requirement, read_answer, split_list
 from brain.compose.pipeline import MAX_TOP_UP, drafts_from, drop_order, fit_page, to_selection, top_up
 from brain.compose.plan import MIN_BULLETS, make_plan
 from brain.compose.review import Tools, review
-from brain.compose.write import Bullet, Draft, check, compose
+from brain.compose.write import Bullet, Draft, check, compose, repeated_openers, serious, voice_problems
 from brain.render.resume import resume_data
 from brain.score.requirements import on_resume
 
@@ -143,7 +143,7 @@ def mag_draft(bank, facts, default_sel):
 
 def test_check_catches_what_isnt_true(bank, facts, mag_draft):
     _, ep = mag_draft
-    good = Bullet("Built **BugPredict**, a multi-agent LangGraph system; used by 3 teams.", [BP])
+    good = Bullet("Built **BugPredict**, a multi-agent LangGraph system now used by 3 teams.", [BP])
     assert check(good, ep, facts, bank, "en", [good]) == []
     mixed = Bullet("Built BugPredict and the aTaS agent.", [BP, ATAS])
     assert any("mixes projects" in p for p in check(mixed, ep, facts, bank, "en", [mixed]))
@@ -152,9 +152,9 @@ def test_check_catches_what_isnt_true(bank, facts, mag_draft):
     assert any("12" in p for p in problems) and any("PyTorch" in p for p in problems)
     other = Bullet("Built a tagger.", [LISA])
     assert any("not in this entry" in p for p in check(other, ep, facts, bank, "en", [other]))
-    long = Bullet("Built BugPredict " + "with LangGraph " * 10, [BP])
+    long = Bullet("Built BugPredict " + "with LangGraph " * 14, [BP])
     assert any(p.startswith("too long") for p in check(long, ep, facts, bank, "en", [long]))
-    vague = Bullet("Built **BugPredict**, a multi-agent system; used by 3 teams.", [BP])
+    vague = Bullet("Built **BugPredict**, a multi-agent system used by 3 teams.", [BP])
     assert any("doesn't name LangGraph" in p for p in check(vague, ep, facts, bank, "en", [vague]))
     twice = [Bullet("Built BugPredict.", [BP]), Bullet("Built BugPredict again.", [BP])]
     assert any("already used" in p for p in check(twice[1], ep, facts, bank, "en", twice))
@@ -186,7 +186,50 @@ def test_compose_sends_failures_back_once_then_drops_them(bank, facts, default_s
     assert drafts[0].bullets[0].covers == [0] and drafts[0].bullets[0].value > 0
     assert notes and "40" in notes[0]
     assert "previous_attempt" in llm.calls[1]["user"] and "bank/style.md" not in llm.calls[0]["system"]
-    assert "Built and deployed **BugPredict**" in llm.calls[0]["system"]         # the style examples
+    assert "Turned the Jira and Confluence connector" in llm.calls[0]["system"]   # the style examples
+    kept = drafts[0].bullets[0]                                     # a semicolon: style, not dropped
+    assert any(p.startswith("style:") for p in kept.problems) and not serious(kept.problems)
+
+
+@pytest.mark.parametrize("text, lang, smell", [
+    ("**ARGUS:** built a no-code agent engine.", "en", "label"),
+    ("Built ARGUS solo: a plug-and-play agent engine so testers create agents.", "en", "colon"),
+    ("Built **BugPredict**, a LangGraph system; used by 3 teams.", "en", "semicolon"),
+    ("Refactored BugPredict into plugins (ToolRegistry, Pydantic, LangGraph edges).", "en", "brackets"),
+    ("Added Pydantic validation to enforce strict schemas despite model randomness.", "en", "despite"),
+    ("Leveraged LangGraph to build a robust pipeline.", "en", "leverag, robust"),
+    ("Conçu un pipeline robuste permettant de traiter les comptes rendus.", "fr", "robuste, permettant de"),
+])
+def test_voice_problems_catch_machine_written_turns(text, lang, smell):
+    found = " ".join(voice_problems(text, lang))
+    assert found.startswith("style:") and all(s in found for s in smell.split(", "))
+
+
+@pytest.mark.parametrize("text, lang", [
+    ("Wrote **ARGUS** on my own, an agent engine that lets testers set up their own agents without writing code.", "en"),
+    ("On BigVul, every bug BugPredict flagged was real (precision 1.0), though it caught about a quarter of them.", "en"),
+    ("Raised the model's precision from about 0.90 to 0.96 by fixing the data, not the model.", "en"),
+    ("Reproduced PnP-Flow (ICLR 2025), combining Plug-and-Play methods with Flow Matching.", "en"),
+    ("Développé seul **ARGUS**, un moteur d'agents qui permet aux testeurs de créer leurs agents sans coder.", "fr"),
+])
+def test_voice_problems_leave_plain_sentences_alone(text, lang):
+    assert voice_problems(text, lang) == []
+
+
+def test_repeated_openers_on_the_resume_and_in_an_entry(bank, facts, default_sel):
+    plan = _plan(bank, facts, default_sel, ("LangGraph", "required", [(BP, 3)]))
+    drafts = [Draft(ep, [Bullet(f"Built thing {i}.", [p.key]) for i, p in zip(range(2), ep.pool)])
+              for ep in plan.entries if ep.section == "experience"]
+    for d in drafts:
+        for b in d.bullets:
+            b.problems = []
+    repeated_openers(drafts)
+    flagged = [b for d in drafts for b in d.bullets if b.problems]
+    assert len(flagged) == sum(len(d.bullets) for d in drafts) - 2     # all but the first two "Built"
+    assert all('"Built" already starts' in b.problems[0] for b in flagged)
+    _, ep = next((d, d.plan) for d in drafts if d.where == MAG)
+    two = [Bullet("Built **BugPredict**, a LangGraph system.", [BP]), Bullet("Built an MCP server.", [MCP])]
+    assert any("also starts with" in p for p in check(two[1], ep, facts, bank, "en", two))
 
 
 def test_approved_bullets_are_offered_back(bank, facts, default_sel, tmp_path):

@@ -22,7 +22,7 @@ from .facts import Fact, load_facts
 from .match import Match, Requirement, match
 from .plan import MAX_BULLETS, MIN_BULLETS, EntryPlan, Pick, Plan, make_plan
 from .review import Tools, default_ask, review
-from .write import Bullet, Draft, add_one, check, compose, finish, redo
+from .write import Bullet, Draft, add_one, check, compose, finish, redo, serious
 
 FALLBACK_AFTER_UNKNOWN = 3      # this many made-up fact keys -> try the fallback model
 # Filling the page: below FULL_ENOUGH of the page, the model writes up to MAX_TOP_UP more
@@ -154,7 +154,7 @@ def top_up(bank: dict, default: Selection, plan: Plan, drafts: list[Draft], lang
             d.bullets[:] = before
             return added, str(e)
         new = [b for b in d.bullets if not any(b is x for x in before)]
-        if not new or problems:
+        if not new or serious(problems):
             d.bullets[:] = before
             tried.add(d.where)
             continue
